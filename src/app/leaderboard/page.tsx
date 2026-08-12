@@ -88,17 +88,17 @@ export default function LeaderboardPage() {
     unit: string;
   }) {
     return (
-      <div className="space-y-3">
+      <div className="w-full min-w-0 space-y-3">
         {sorted.map((s, i) => (
           <Card
             key={s.profile.id}
-            className={`border ${
+            className={`w-full min-w-0 overflow-hidden border ${
               i === 0
                 ? "border-amber-400 bg-amber-800/60"
                 : "border-amber-700 bg-amber-900/40"
             }`}
           >
-            <CardContent className="p-3 sm:p-4 flex items-start sm:items-center gap-2 sm:gap-4">
+            <CardContent className="min-w-0 p-3 sm:p-4 flex items-start sm:items-center gap-2 sm:gap-4">
               <span className="text-xl sm:text-2xl w-7 sm:w-8 text-center shrink-0 pt-1 sm:pt-0">
                 {medals[i] ?? `#${i + 1}`}
               </span>
@@ -137,7 +137,7 @@ export default function LeaderboardPage() {
                   </Badge>
                 </div>
               </div>
-              <div className="text-right shrink-0 pt-1 sm:pt-0">
+              <div className="max-w-[4.5rem] text-right shrink-0 pt-1 sm:pt-0">
                 <p className="text-xl sm:text-2xl font-bold text-amber-300">
                 {typeof s[valueKey] === "number"
                   ? (s[valueKey] as number).toFixed(valueKey === "avg" ? 1 : 0)
@@ -159,33 +159,33 @@ export default function LeaderboardPage() {
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="total">
+      <Tabs defaultValue="total" className="w-full min-w-0">
         <div className="space-y-2">
           <p className="text-xs font-medium uppercase tracking-wide text-amber-500">
             Rank by
           </p>
-          <TabsList className="w-full h-auto min-h-10 justify-start overflow-x-auto bg-amber-900/60 border border-amber-700 p-1">
+          <TabsList className="grid w-full min-w-0 grid-cols-2 h-auto gap-1 bg-amber-900/60 border border-amber-700 p-1 sm:flex sm:justify-start">
           <TabsTrigger
             value="total"
-            className="shrink-0 px-2 sm:px-3 text-xs sm:text-sm data-[state=active]:bg-amber-700 text-amber-300 data-[state=active]:text-amber-100"
+            className="min-w-0 px-2 py-2 text-xs sm:shrink-0 sm:px-3 sm:py-1 sm:text-sm data-[state=active]:bg-amber-700 text-amber-300 data-[state=active]:text-amber-100"
           >
             🍺 Most Beers
           </TabsTrigger>
           <TabsTrigger
             value="avg"
-            className="shrink-0 px-2 sm:px-3 text-xs sm:text-sm data-[state=active]:bg-amber-700 text-amber-300 data-[state=active]:text-amber-100"
+            className="min-w-0 px-2 py-2 text-xs sm:shrink-0 sm:px-3 sm:py-1 sm:text-sm data-[state=active]:bg-amber-700 text-amber-300 data-[state=active]:text-amber-100"
           >
             ⭐ Highest Avg
           </TabsTrigger>
           <TabsTrigger
             value="unique"
-            className="shrink-0 px-2 sm:px-3 text-xs sm:text-sm data-[state=active]:bg-amber-700 text-amber-300 data-[state=active]:text-amber-100"
+            className="min-w-0 px-2 py-2 text-xs sm:shrink-0 sm:px-3 sm:py-1 sm:text-sm data-[state=active]:bg-amber-700 text-amber-300 data-[state=active]:text-amber-100"
           >
             🌈 Variety
           </TabsTrigger>
           <TabsTrigger
             value="achievements"
-            className="shrink-0 px-2 sm:px-3 text-xs sm:text-sm data-[state=active]:bg-amber-700 text-amber-300 data-[state=active]:text-amber-100"
+            className="min-w-0 px-2 py-2 text-xs sm:shrink-0 sm:px-3 sm:py-1 sm:text-sm data-[state=active]:bg-amber-700 text-amber-300 data-[state=active]:text-amber-100"
           >
             🏆
           </TabsTrigger>
