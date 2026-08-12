@@ -10,9 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { User, Camera } from "lucide-react";
+import { User, Camera, Trash2 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { compressIfNeeded } from "@/lib/compress-image";
+import { ACHIEVEMENTS } from "@/lib/achievements";
 import { useRouter } from "next/navigation";
 
 export default function ProfilePage() {
@@ -24,6 +25,7 @@ export default function ProfilePage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isSetup, setIsSetup] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -113,6 +115,85 @@ export default function ProfilePage() {
     }
 
     setSaving(false);
+  }
+
+  async function handleDelete(log: BeerLog) {
+    if (!window.confirm(`Delete your ${log.beer_name} log?`)) return;
+
+    setDeletingId(log.id);
+    setError("");
+    setSuccess("");
+
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: deletedBeer, error: deleteErr } = await supabase
+      .from("beer_logs")
+      .delete()
+      .eq("id", log.id)
+      .select("id")
+      .maybeSingle();
+
+    if (deleteErr || !deletedBeer) {
+      setError(
+        deleteErr?.message ??
+          "The beer could not be deleted. Check that the owner delete policy is enabled in Supabase."
+      );
+    } else {
+      const remainingLogs = logs.filter((current) => current.id !== log.id);
+      const { data: existingAchievements, error: achievementsError } =
+        await supabase
+          .from("achievements")
+          .select("achievement_key")
+          .eq("user_id", user.id);
+
+      if (achievementsError) {
+        setError(achievementsError.message);
+      } else {
+        const validKeys = new Set(
+          ACHIEVEMENTS.filter((achievement) =>
+            achievement.check(remainingLogs, profile ?? ({} as Profile))
+          ).map((achievement) => achievement.key)
+        );
+        const invalidKeys = (existingAchievements ?? [])
+          .map((achievement) => achievement.achievement_key)
+          .filter((key) => !validKeys.has(key));
+
+        const invalidationResults = await Promise.all(
+          invalidKeys.map((key) =>
+            supabase
+              .from("achievements")
+              .delete()
+              .eq("user_id", user.id)
+              .eq("achievement_key", key)
+              .select("id")
+          )
+        );
+        const invalidationError = invalidationResults.find((result) => result.error)?.error;
+        const invalidationDenied = invalidationResults.some(
+          (result) => !result.error && result.data?.length === 0
+        );
+
+        if (invalidationError || invalidationDenied) {
+          setError(
+            invalidationError?.message ??
+              "Achievements could not be updated. Check the achievement delete policy in Supabase."
+          );
+        } else {
+          setLogs(remainingLogs);
+          setSuccess(
+            invalidKeys.length > 0
+              ? "Beer log deleted and achievements updated."
+              : "Beer log deleted."
+          );
+        }
+      }
+    }
+
+    setDeletingId(null);
   }
 
   if (loading)
@@ -238,9 +319,21 @@ export default function ProfilePage() {
                       )}
                     </div>
                   </div>
-                  <span className="text-xs text-amber-600 shrink-0">
-                    {formatDate(log.created_at)}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs text-amber-600">
+                      {formatDate(log.created_at)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(log)}
+                      disabled={deletingId === log.id}
+                      aria-label={`Delete ${log.beer_name}`}
+                      title="Delete beer log"
+                      className="p-1 text-amber-600 hover:text-red-400 disabled:opacity-50"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
                 </div>
                 <Separator className="mt-3 bg-amber-800/50" />
               </div>

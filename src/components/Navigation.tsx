@@ -14,11 +14,11 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/log-beer", label: "Log Beer", icon: Beer },
-  { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
-  { href: "/achievements", label: "Achievements", icon: Medal },
-  { href: "/profile", label: "Profile", icon: User },
+  { href: "/dashboard", label: "Dashboard", mobileLabel: "Home", icon: LayoutDashboard },
+  { href: "/log-beer", label: "Log Beer", mobileLabel: "Log", icon: Beer },
+  { href: "/leaderboard", label: "Leaderboard", mobileLabel: "Board", icon: Trophy },
+  { href: "/achievements", label: "Achievements", mobileLabel: "Badges", icon: Medal },
+  { href: "/profile", label: "Profile", mobileLabel: "Me", icon: User },
 ];
 
 export default function Navigation() {
@@ -52,19 +52,19 @@ export default function Navigation() {
 
       {/* Bottom tab bar for mobile */}
       <nav className="fixed bottom-0 left-0 right-0 bg-amber-900/95 backdrop-blur border-t border-amber-800 z-50 flex md:hidden">
-        {navItems.map(({ href, label, icon: Icon }) => (
+        {navItems.map(({ href, label, mobileLabel, icon: Icon }) => (
           <Link
             key={href}
             href={href}
             className={cn(
-              "flex-1 flex flex-col items-center py-2 text-xs gap-1 transition-colors",
+              "min-w-0 flex-1 flex flex-col items-center py-2 text-[10px] gap-1 transition-colors",
               pathname === href
                 ? "text-amber-300"
                 : "text-amber-500 hover:text-amber-300"
             )}
           >
             <Icon size={20} />
-            <span>{label}</span>
+            <span className="truncate max-w-full px-1">{mobileLabel}</span>
           </Link>
         ))}
       </nav>

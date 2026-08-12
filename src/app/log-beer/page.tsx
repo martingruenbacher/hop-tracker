@@ -173,7 +173,7 @@ export default function LogBeerPage() {
               </datalist>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label className="text-amber-200">Brewery</Label>
                 <Input
@@ -230,7 +230,7 @@ export default function LogBeerPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label className="text-amber-200">City</Label>
                 <Select value={city} onValueChange={(v) => setCity(v ?? "")}>

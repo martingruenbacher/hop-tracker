@@ -76,6 +76,13 @@ create policy "Users can insert their own achievements"
   on public.achievements for insert
   to authenticated with check (auth.uid() = user_id);
 
+create policy "Users can delete their own achievements"
+  on public.achievements for delete
+  to authenticated using (auth.uid() = user_id);
+
+-- Enable live dashboard updates for beer logs
+alter publication supabase_realtime add table public.beer_logs;
+
 -- Storage bucket for avatars and beer photos
 insert into storage.buckets (id, name, public) values ('avatars', 'avatars', true);
 insert into storage.buckets (id, name, public) values ('beer-photos', 'beer-photos', true);

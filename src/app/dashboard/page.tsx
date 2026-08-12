@@ -17,7 +17,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { Beer, Star, MapPin, Trophy } from "lucide-react";
+import { Beer, Star, MapPin, Trophy, Share2 } from "lucide-react";
 import Link from "next/link";
 import { ACHIEVEMENTS } from "@/lib/achievements";
 
@@ -27,6 +27,8 @@ export default function DashboardPage() {
   const [allLogs, setAllLogs] = useState<BeerLog[]>([]);
   const [unlockedKeys, setUnlockedKeys] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isLive, setIsLive] = useState(false);
+  const [shareMessage, setShareMessage] = useState("");
 
   useEffect(() => {
     const supabase = createClient();
@@ -65,7 +67,23 @@ export default function DashboardPage() {
       setUnlockedKeys(achiev?.map((a) => a.achievement_key) ?? []);
       setLoading(false);
     }
+
+    const channel = supabase
+      .channel(`dashboard-beer-activity-${Date.now()}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "beer_logs" },
+        async () => {
+          await load();
+        }
+      )
+      .subscribe((status) => setIsLive(status === "SUBSCRIBED"));
+
     load();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   if (loading)
@@ -89,6 +107,34 @@ export default function DashboardPage() {
     stars: `${"★".repeat(r)}`,
     count: logs.filter((l) => l.rating === r).length,
   }));
+
+  const itinerary = [
+    { days: "Days 1–2", city: "Český Krumlov", icon: "🛶", theme: "Boating on the Moldau" },
+    { days: "Days 3–4", city: "České Budějovice", icon: "🏭", theme: "Budvar country" },
+    { days: "Days 5–7", city: "Prague", icon: "🏰", theme: "The grand finale" },
+  ];
+  const topBeer = [...logs].sort((a, b) => b.rating - a.rating)[0];
+  const favoriteCity = TRIP_CITIES.map((city) => ({
+    city,
+    count: logs.filter((log) => log.city === city).length,
+  })).sort((a, b) => b.count - a.count)[0];
+  const uniqueBars = new Set(logs.map((log) => log.bar_name).filter(Boolean)).size;
+
+  async function shareRecap() {
+    const recap = `Hop Tracker recap: ${logs.length} beers, ${uniqueBars} pubs, ${avgRating} average rating. Top beer: ${topBeer?.beer_name ?? "TBD"}.`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Hop Tracker recap", text: recap });
+      } else {
+        await navigator.clipboard.writeText(recap);
+        setShareMessage("Recap copied!");
+        setTimeout(() => setShareMessage(""), 2000);
+      }
+    } catch {
+      setShareMessage("Sharing cancelled");
+      setTimeout(() => setShareMessage(""), 2000);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -157,6 +203,36 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      {/* Trip itinerary */}
+      <Card className="bg-amber-900/60 border-amber-700">
+        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-amber-100 text-base">Trip itinerary</CardTitle>
+            <p className="text-xs text-amber-500 mt-1">Seven days, three cities, one leaderboard</p>
+          </div>
+          <span className="text-xs text-emerald-400">{isLive ? "● Live" : "○ Connecting"}</span>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-3 gap-2">
+            {itinerary.map((stop) => {
+              const count = logs.filter((log) => log.city === stop.city).length;
+              return (
+                <div key={stop.city} className="rounded-lg border border-amber-800 bg-amber-950/40 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xl">{stop.icon}</span>
+                    <Badge variant="outline" className="border-amber-700 text-amber-400 text-xs">
+                      {count} {count === 1 ? "beer" : "beers"}
+                    </Badge>
+                  </div>
+                  <p className="text-amber-100 font-medium text-sm mt-2">{stop.city}</p>
+                  <p className="text-amber-500 text-xs">{stop.days} · {stop.theme}</p>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid md:grid-cols-2 gap-6">
         {/* Beers by city */}
         <Card className="bg-amber-900/60 border-amber-700">
@@ -212,14 +288,17 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2 mt-1">
-              {ratingData.reverse().map(({ stars, count }) => (
+              {[...ratingData].reverse().map(({ stars, count }) => (
                 <div key={stars} className="flex items-center gap-2">
                   <span className="text-amber-400 text-xs w-14">{stars}</span>
                   <Progress
                     value={logs.length ? (count / logs.length) * 100 : 0}
-                    className="h-2 flex-1 bg-amber-800"
+                    className="h-3 flex-1 rounded-full bg-amber-950"
+                    indicatorClassName="bg-amber-400"
                   />
-                  <span className="text-amber-400 text-xs w-4">{count}</span>
+                  <span className="text-amber-300 text-xs w-10 text-right">
+                    {count} ({logs.length ? Math.round((count / logs.length) * 100) : 0}%)
+                  </span>
                 </div>
               ))}
             </div>
@@ -281,6 +360,29 @@ export default function DashboardPage() {
               </div>
             ))
           )}
+        </CardContent>
+      </Card>
+
+      {/* Trip recap */}
+      <Card className="bg-amber-800/50 border-amber-600">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-amber-100 text-base">Trip recap so far</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+            <div><p className="text-xl font-bold text-amber-100">{logs.length}</p><p className="text-xs text-amber-400">Beers</p></div>
+            <div><p className="text-xl font-bold text-amber-100">{uniqueBars}</p><p className="text-xs text-amber-400">Pubs</p></div>
+            <div><p className="text-xl font-bold text-amber-100">{favoriteCity?.count ? favoriteCity.city : "—"}</p><p className="text-xs text-amber-400">Top city</p></div>
+            <div><p className="text-xl font-bold text-amber-100">{topBeer?.beer_name ?? "—"}</p><p className="text-xs text-amber-400">Top beer</p></div>
+          </div>
+          <button
+            type="button"
+            onClick={shareRecap}
+            className="mt-4 inline-flex items-center gap-2 text-sm text-amber-200 hover:text-white"
+          >
+            <Share2 size={16} /> Share recap
+          </button>
+          {shareMessage && <span className="ml-3 text-xs text-emerald-300">{shareMessage}</span>}
         </CardContent>
       </Card>
 

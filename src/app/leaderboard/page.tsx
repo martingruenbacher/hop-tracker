@@ -98,11 +98,11 @@ export default function LeaderboardPage() {
                 : "border-amber-700 bg-amber-900/40"
             }`}
           >
-            <CardContent className="p-4 flex items-center gap-4">
-              <span className="text-2xl w-8 text-center">
+            <CardContent className="p-3 sm:p-4 flex items-start sm:items-center gap-2 sm:gap-4">
+              <span className="text-xl sm:text-2xl w-7 sm:w-8 text-center shrink-0 pt-1 sm:pt-0">
                 {medals[i] ?? `#${i + 1}`}
               </span>
-              <div className="w-10 h-10 rounded-full bg-amber-700 flex items-center justify-center overflow-hidden shrink-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-amber-700 flex items-center justify-center overflow-hidden shrink-0">
                 {s.profile.avatar_url ? (
                   <img
                     src={s.profile.avatar_url}
@@ -112,33 +112,33 @@ export default function LeaderboardPage() {
                   <span className="text-lg">🍺</span>
                 )}
               </div>
-              <div className="flex-1">
-                <p className="font-semibold text-amber-100">
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-amber-100 truncate">
                   {s.profile.player_name}
                 </p>
-                <div className="flex gap-2 mt-1 flex-wrap">
+                <div className="flex gap-1.5 mt-1 flex-wrap">
                   <Badge
                     variant="outline"
-                    className="text-xs border-amber-700 text-amber-400"
+                    className="text-[10px] sm:text-xs border-amber-700 text-amber-400 px-1.5"
                   >
                     🍺 {s.total} beers
                   </Badge>
                   <Badge
                     variant="outline"
-                    className="text-xs border-amber-700 text-amber-400"
+                    className="text-[10px] sm:text-xs border-amber-700 text-amber-400 px-1.5"
                   >
                     ⭐ {s.avg.toFixed(1)} avg
                   </Badge>
                   <Badge
                     variant="outline"
-                    className="text-xs border-amber-700 text-amber-400"
+                    className="text-[10px] sm:text-xs border-amber-700 text-amber-400 px-1.5"
                   >
                     🏆 {s.achievements}
                   </Badge>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-amber-300">
+              <div className="text-right shrink-0 pt-1 sm:pt-0">
+                <p className="text-xl sm:text-2xl font-bold text-amber-300">
                 {typeof s[valueKey] === "number"
                   ? (s[valueKey] as number).toFixed(valueKey === "avg" ? 1 : 0)
                   : String(s[valueKey])}
@@ -168,28 +168,28 @@ export default function LeaderboardPage() {
       </div>
 
       <Tabs defaultValue="total">
-        <TabsList className="bg-amber-900/60 border border-amber-700">
+        <TabsList className="w-full h-auto min-h-10 justify-start overflow-x-auto bg-amber-900/60 border border-amber-700 p-1">
           <TabsTrigger
             value="total"
-            className="data-[state=active]:bg-amber-700 text-amber-300 data-[state=active]:text-amber-100"
+            className="shrink-0 px-2 sm:px-3 text-xs sm:text-sm data-[state=active]:bg-amber-700 text-amber-300 data-[state=active]:text-amber-100"
           >
             🍺 Most Beers
           </TabsTrigger>
           <TabsTrigger
             value="avg"
-            className="data-[state=active]:bg-amber-700 text-amber-300 data-[state=active]:text-amber-100"
+            className="shrink-0 px-2 sm:px-3 text-xs sm:text-sm data-[state=active]:bg-amber-700 text-amber-300 data-[state=active]:text-amber-100"
           >
             ⭐ Highest Avg
           </TabsTrigger>
           <TabsTrigger
             value="unique"
-            className="data-[state=active]:bg-amber-700 text-amber-300 data-[state=active]:text-amber-100"
+            className="shrink-0 px-2 sm:px-3 text-xs sm:text-sm data-[state=active]:bg-amber-700 text-amber-300 data-[state=active]:text-amber-100"
           >
             🌈 Variety
           </TabsTrigger>
           <TabsTrigger
             value="achievements"
-            className="data-[state=active]:bg-amber-700 text-amber-300 data-[state=active]:text-amber-100"
+            className="shrink-0 px-2 sm:px-3 text-xs sm:text-sm data-[state=active]:bg-amber-700 text-amber-300 data-[state=active]:text-amber-100"
           >
             🏆
           </TabsTrigger>
