@@ -30,6 +30,7 @@ export default function DashboardPage() {
   const [unlockedKeys, setUnlockedKeys] = useState<string[]>([]);
   const [challengePoints, setChallengePoints] = useState(0);
   const [completedChallenges, setCompletedChallenges] = useState(0);
+  const [currentChallengeAwarded, setCurrentChallengeAwarded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
@@ -68,7 +69,7 @@ export default function DashboardPage() {
           supabase.from("beer_logs").select("*"),
           supabase
             .from("challenge_completions")
-            .select("points")
+            .select("points, challenge_key, challenge_date")
             .eq("user_id", user.id),
         ]);
 
@@ -85,6 +86,16 @@ export default function DashboardPage() {
         (completions ?? []).reduce((sum, item) => sum + item.points, 0)
       );
       setCompletedChallenges(completions?.length ?? 0);
+      const todayChallenge = getTodayChallenge();
+      const today = new Date();
+      const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+      setCurrentChallengeAwarded(
+        (completions ?? []).some(
+          (item) =>
+            item.challenge_key === todayChallenge.key &&
+            item.challenge_date === todayKey
+        )
+      );
       setLoading(false);
     }
 
@@ -141,8 +152,11 @@ export default function DashboardPage() {
     groupLogs.map((log) => log.bar_name?.trim().toLowerCase()).filter(Boolean)
   ).size;
   const groupPlayers = new Set(groupLogs.map((log) => log.user_id)).size;
-  const groupCities = new Set(groupLogs.map((log) => log.city).filter(Boolean)).size;
   const groupTopBeer = [...groupLogs].sort((a, b) => b.rating - a.rating)[0];
+  const groupTopCity = TRIP_CITIES.map((city) => ({
+    city,
+    count: groupLogs.filter((log) => log.city === city).length,
+  })).sort((a, b) => b.count - a.count)[0];
   const favoriteCity = TRIP_CITIES.map((city) => ({
     city,
     count: logs.filter((log) => log.city === city).length,
@@ -152,6 +166,8 @@ export default function DashboardPage() {
   const challenge = getTodayChallenge();
   const challengeProgress = Math.min(challenge.target, challenge.progress(todaysLogs));
   const challengeComplete = challengeProgress >= challenge.target;
+  const displayedChallengePoints = challengePoints +
+    (challengeComplete && !currentChallengeAwarded ? challenge.points : 0);
   const crawlByCity = TRIP_CITIES.map((city) => ({
     city,
     pubs: new Set(
@@ -483,7 +499,7 @@ export default function DashboardPage() {
             <div><p className="text-xl font-bold text-amber-100">{uniqueBars}</p><p className="text-xs text-amber-400">Pubs</p></div>
             <div><p className="text-xl font-bold text-amber-100">{favoriteCity?.count ? favoriteCity.city : "—"}</p><p className="text-xs text-amber-400">Top city</p></div>
             <div><p className="text-xl font-bold text-amber-100">{topBeer?.beer_name ?? "—"}</p><p className="text-xs text-amber-400">Top beer</p></div>
-            <div><p className="text-xl font-bold text-amber-100">{challengePoints}</p><p className="text-xs text-amber-400">Challenge pts</p></div>
+            <div><p className="text-xl font-bold text-amber-100">{displayedChallengePoints}</p><p className="text-xs text-amber-400">Challenge pts</p></div>
           </div>
           <p className="mt-3 text-xs text-amber-500">
             {completedChallenges} challenge{completedChallenges === 1 ? "" : "s"} completed
@@ -511,7 +527,7 @@ export default function DashboardPage() {
             <div><p className="text-xl font-bold text-amber-100">{groupAverage}</p><p className="text-xs text-amber-400">Avg rating</p></div>
             <div><p className="text-xl font-bold text-amber-100">{groupPubs}</p><p className="text-xs text-amber-400">Pubs</p></div>
             <div><p className="text-xl font-bold text-amber-100">{groupPlayers}</p><p className="text-xs text-amber-400">Players</p></div>
-            <div><p className="text-xl font-bold text-amber-100">{groupCities}/3</p><p className="text-xs text-amber-400">Cities</p></div>
+            <div><p className="truncate text-xl font-bold text-amber-100">{groupTopCity?.count ? groupTopCity.city : "—"}</p><p className="text-xs text-amber-400">Top city</p></div>
           </div>
           <p className="mt-4 text-sm text-amber-300">
             Group favourite so far: <span className="font-semibold">{groupTopBeer?.beer_name ?? "No beers yet"}</span>

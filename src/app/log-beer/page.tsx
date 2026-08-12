@@ -111,12 +111,19 @@ export default function LogBeerPage() {
         .maybeSingle();
 
       if (!existingCompletion) {
-        await supabase.from("challenge_completions").insert({
+        const { error: completionError } = await supabase
+          .from("challenge_completions")
+          .insert({
           user_id: user.id,
           challenge_key: todayChallenge.key,
           challenge_date: today,
           points: todayChallenge.points,
-        });
+          });
+        if (completionError) {
+          setError(
+            `Challenge completed, but points could not be saved: ${completionError.message}`
+          );
+        }
       }
     }
 
