@@ -21,6 +21,7 @@ import { ACHIEVEMENTS, checkNewAchievements } from "@/lib/achievements";
 import { compressIfNeeded } from "@/lib/compress-image";
 import { BeerLog } from "@/lib/types";
 import { Beer, Camera, ImagePlus, Star } from "lucide-react";
+import { getLocalDate, getTodayChallenge, isToday } from "@/lib/challenges";
 
 export default function LogBeerPage() {
   const router = useRouter();
@@ -94,6 +95,31 @@ export default function LogBeerPage() {
       .from("beer_logs")
       .select("*")
       .eq("user_id", user.id);
+
+    const today = getLocalDate();
+    const todayChallenge = getTodayChallenge();
+    const todaysLogs = ((allLogs as BeerLog[]) ?? []).filter((log) =>
+      isToday(log.created_at)
+    );
+    if (todayChallenge.progress(todaysLogs) >= todayChallenge.target) {
+      const { data: existingCompletion } = await supabase
+        .from("challenge_completions")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("challenge_key", todayChallenge.key)
+        .eq("challenge_date", today)
+        .maybeSingle();
+
+      if (!existingCompletion) {
+        await supabase.from("challenge_completions").insert({
+          user_id: user.id,
+          challenge_key: todayChallenge.key,
+          challenge_date: today,
+          points: todayChallenge.points,
+        });
+      }
+    }
+
     const { data: existingAchievements } = await supabase
       .from("achievements")
       .select("achievement_key")

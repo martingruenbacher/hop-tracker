@@ -20,118 +20,15 @@ import {
 import { Beer, Star, MapPin, Trophy, Share2, Compass, Target } from "lucide-react";
 import Link from "next/link";
 import { ACHIEVEMENTS } from "@/lib/achievements";
-
-const dailyChallenges = [
-  {
-    icon: "🧭",
-    title: "Pub Scout",
-    description: "Visit 2 different named pubs today.",
-    target: 2,
-    progress: (logs: BeerLog[]) =>
-      new Set(logs.map((log) => log.bar_name?.trim().toLowerCase()).filter(Boolean)).size,
-  },
-  {
-    icon: "🎨",
-    title: "Style Explorer",
-    description: "Try 2 different beer styles today.",
-    target: 2,
-    progress: (logs: BeerLog[]) =>
-      new Set(logs.map((log) => log.style).filter(Boolean)).size,
-  },
-  {
-    icon: "📝",
-    title: "Tasting Panel",
-    description: "Give thoughtful ratings to 3 beers today.",
-    target: 3,
-    progress: (logs: BeerLog[]) => logs.length,
-  },
-  {
-    icon: "🏙️",
-    title: "City Specialist",
-    description: "Log 3 beers in the same city today.",
-    target: 3,
-    progress: (logs: BeerLog[]) => {
-      const counts = new Map<string, number>();
-      logs.forEach((log) => {
-        if (log.city) counts.set(log.city, (counts.get(log.city) ?? 0) + 1);
-      });
-      return Math.max(0, ...counts.values());
-    },
-  },
-  {
-    icon: "🚶",
-    title: "Pub Marathon",
-    description: "Visit 4 different named pubs today.",
-    target: 4,
-    progress: (logs: BeerLog[]) =>
-      new Set(logs.map((log) => log.bar_name?.trim().toLowerCase()).filter(Boolean)).size,
-  },
-  {
-    icon: "🏭",
-    title: "Brewery Flight",
-    description: "Try beers from 3 different breweries today.",
-    target: 3,
-    progress: (logs: BeerLog[]) =>
-      new Set(logs.map((log) => log.brewery?.trim().toLowerCase()).filter(Boolean)).size,
-  },
-  {
-    icon: "📸",
-    title: "Photo Journalist",
-    description: "Capture 3 beer photos today.",
-    target: 3,
-    progress: (logs: BeerLog[]) => logs.filter((log) => Boolean(log.photo_url)).length,
-  },
-  {
-    icon: "🌈",
-    title: "Variety Sprint",
-    description: "Log 4 different beers today.",
-    target: 4,
-    progress: (logs: BeerLog[]) =>
-      new Set(logs.map((log) => log.beer_name.trim().toLowerCase())).size,
-  },
-  {
-    icon: "🎨",
-    title: "Style Flight",
-    description: "Try 4 different beer styles today.",
-    target: 4,
-    progress: (logs: BeerLog[]) =>
-      new Set(logs.map((log) => log.style).filter(Boolean)).size,
-  },
-  {
-    icon: "⭐",
-    title: "Perfect Scores",
-    description: "Give 3 beers a 5-star rating today.",
-    target: 3,
-    progress: (logs: BeerLog[]) => logs.filter((log) => log.rating === 5).length,
-  },
-  {
-    icon: "🗺️",
-    title: "Grand Pub Tour",
-    description: "Visit 5 different named pubs today.",
-    target: 5,
-    progress: (logs: BeerLog[]) =>
-      new Set(logs.map((log) => log.bar_name?.trim().toLowerCase()).filter(Boolean)).size,
-  },
-  {
-    icon: "📝",
-    title: "Critics Circle",
-    description: "Write ratings for 6 beers today.",
-    target: 6,
-    progress: (logs: BeerLog[]) => logs.length,
-  },
-] as const;
-
-function isToday(date: string) {
-  const value = new Date(date);
-  const today = new Date();
-  return value.toDateString() === today.toDateString();
-}
+import { getTodayChallenge, isToday } from "@/lib/challenges";
 
 export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [logs, setLogs] = useState<BeerLog[]>([]);
   const [allLogs, setAllLogs] = useState<BeerLog[]>([]);
   const [unlockedKeys, setUnlockedKeys] = useState<string[]>([]);
+  const [challengePoints, setChallengePoints] = useState(0);
+  const [completedChallenges, setCompletedChallenges] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
@@ -144,7 +41,13 @@ export default function DashboardPage() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      const [{ data: prof }, { data: myLogs }, { data: achiev }, { data: everyone }] =
+      const [
+        { data: prof },
+        { data: myLogs },
+        { data: achiev },
+        { data: everyone },
+        { data: completions },
+      ] =
         await Promise.all([
           supabase.from("profiles").select("*").eq("id", user.id).single(),
           supabase
@@ -161,6 +64,10 @@ export default function DashboardPage() {
             .select("*, profiles(player_name, avatar_url)")
             .order("created_at", { ascending: false })
             .limit(5),
+          supabase
+            .from("challenge_completions")
+            .select("points")
+            .eq("user_id", user.id),
         ]);
 
       if (!prof) {
@@ -171,6 +78,10 @@ export default function DashboardPage() {
       setLogs(myLogs ?? []);
       setAllLogs(everyone ?? []);
       setUnlockedKeys(achiev?.map((a) => a.achievement_key) ?? []);
+      setChallengePoints(
+        (completions ?? []).reduce((sum, item) => sum + item.points, 0)
+      );
+      setCompletedChallenges(completions?.length ?? 0);
       setLoading(false);
     }
 
@@ -226,8 +137,9 @@ export default function DashboardPage() {
   })).sort((a, b) => b.count - a.count)[0];
   const uniqueBars = new Set(logs.map((log) => log.bar_name).filter(Boolean)).size;
   const todaysLogs = logs.filter((log) => isToday(log.created_at));
-  const challenge = dailyChallenges[new Date().getDate() % dailyChallenges.length];
+  const challenge = getTodayChallenge();
   const challengeProgress = Math.min(challenge.target, challenge.progress(todaysLogs));
+  const challengeComplete = challengeProgress >= challenge.target;
   const crawlByCity = TRIP_CITIES.map((city) => ({
     city,
     pubs: new Set(
@@ -377,8 +289,10 @@ export default function DashboardPage() {
                 {challengeProgress}/{challenge.target}
               </span>
             </div>
-            {challengeProgress >= challenge.target && (
-              <p className="mt-3 text-xs font-medium text-emerald-300">Challenge complete!</p>
+            {challengeComplete && (
+              <p className="mt-3 text-xs font-medium text-emerald-300">
+                Challenge complete! +{challenge.points} points
+              </p>
             )}
             {challengeProgress < challenge.target && (
               <Link href="/log-beer" className="mt-3 inline-block text-xs text-amber-300 underline">
@@ -552,12 +466,16 @@ export default function DashboardPage() {
           <CardTitle className="text-amber-100 text-base">Trip recap so far</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
             <div><p className="text-xl font-bold text-amber-100">{logs.length}</p><p className="text-xs text-amber-400">Beers</p></div>
             <div><p className="text-xl font-bold text-amber-100">{uniqueBars}</p><p className="text-xs text-amber-400">Pubs</p></div>
             <div><p className="text-xl font-bold text-amber-100">{favoriteCity?.count ? favoriteCity.city : "—"}</p><p className="text-xs text-amber-400">Top city</p></div>
             <div><p className="text-xl font-bold text-amber-100">{topBeer?.beer_name ?? "—"}</p><p className="text-xs text-amber-400">Top beer</p></div>
+            <div><p className="text-xl font-bold text-amber-100">{challengePoints}</p><p className="text-xs text-amber-400">Challenge pts</p></div>
           </div>
+          <p className="mt-3 text-xs text-amber-500">
+            {completedChallenges} challenge{completedChallenges === 1 ? "" : "s"} completed
+          </p>
           <button
             type="button"
             onClick={shareRecap}

@@ -29,6 +29,15 @@ export interface Achievement {
   unlocked_at: string;
 }
 
+export interface ChallengeCompletion {
+  id: string;
+  user_id: string;
+  challenge_key: string;
+  challenge_date: string;
+  points: number;
+  completed_at: string;
+}
+
 export interface AchievementDefinition {
   key: string;
   title: string;

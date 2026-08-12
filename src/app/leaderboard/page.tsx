@@ -15,6 +15,8 @@ interface PlayerStats {
   unique: number;
   cities: number;
   achievements: number;
+  challengePoints: number;
+  challengesCompleted: number;
 }
 
 const categories = [
@@ -22,6 +24,7 @@ const categories = [
   { key: "avg", label: "Highest Avg", icon: "⭐", valueKey: "avg", unit: "avg ★" },
   { key: "unique", label: "Variety", icon: "🌈", valueKey: "unique", unit: "unique beers" },
   { key: "achievements", label: "Achievements", icon: "🏆", valueKey: "achievements", unit: "achievements" },
+  { key: "challengePoints", label: "Challenges", icon: "🎯", valueKey: "challengePoints", unit: "points" },
 ] as const;
 
 type CategoryKey = (typeof categories)[number]["key"];
@@ -34,13 +37,19 @@ export default function LeaderboardPage() {
   useEffect(() => {
     const supabase = createClient();
     async function load() {
-      const [{ data: profiles }, { data: logs }, { data: achievements }] =
+      const [
+        { data: profiles },
+        { data: logs },
+        { data: achievements },
+        { data: completions },
+      ] =
         await Promise.all([
           supabase.from("profiles").select("*"),
           supabase
             .from("beer_logs")
             .select("user_id, beer_name, rating, city, created_at"),
           supabase.from("achievements").select("user_id"),
+          supabase.from("challenge_completions").select("user_id, points"),
         ]);
 
       if (!profiles) return;
@@ -51,6 +60,9 @@ export default function LeaderboardPage() {
         );
         const myAchievements = (achievements ?? []).filter(
           (a: { user_id: string }) => a.user_id === p.id
+        );
+        const myChallenges = (completions ?? []).filter(
+          (completion: { user_id: string }) => completion.user_id === p.id
         );
         return {
           profile: p,
@@ -69,6 +81,12 @@ export default function LeaderboardPage() {
             myLogs.map((l: Partial<BeerLog>) => l.city).filter(Boolean)
           ).size,
           achievements: myAchievements.length,
+          challengePoints: myChallenges.reduce(
+            (sum: number, completion: { points: number }) =>
+              sum + completion.points,
+            0
+          ),
+          challengesCompleted: myChallenges.length,
         };
       });
 
@@ -144,6 +162,12 @@ export default function LeaderboardPage() {
                     className="text-[10px] sm:text-xs border-amber-700 text-amber-400 px-1.5"
                   >
                     🏆 {s.achievements}
+                  </Badge>
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] sm:text-xs border-amber-700 text-amber-400 px-1.5"
+                  >
+                    🎯 {s.challengePoints} pts
                   </Badge>
                 </div>
               </div>

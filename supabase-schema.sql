@@ -32,10 +32,22 @@ create table public.achievements (
   unique (user_id, achievement_key)
 );
 
+-- Daily challenge history and points
+create table public.challenge_completions (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  challenge_key text not null,
+  challenge_date date not null,
+  points integer not null check (points > 0),
+  completed_at timestamptz default now() not null,
+  unique (user_id, challenge_key, challenge_date)
+);
+
 -- RLS policies
 alter table public.profiles enable row level security;
 alter table public.beer_logs enable row level security;
 alter table public.achievements enable row level security;
+alter table public.challenge_completions enable row level security;
 
 -- Profiles: anyone authenticated can read, only owner can update
 create policy "Public profiles are viewable by authenticated users"
@@ -79,6 +91,14 @@ create policy "Users can insert their own achievements"
 create policy "Users can delete their own achievements"
   on public.achievements for delete
   to authenticated using (auth.uid() = user_id);
+
+create policy "Challenge completions are viewable by authenticated users"
+  on public.challenge_completions for select
+  to authenticated using (true);
+
+create policy "Users can insert their own challenge completions"
+  on public.challenge_completions for insert
+  to authenticated with check (auth.uid() = user_id);
 
 -- Enable live dashboard updates for beer logs
 alter publication supabase_realtime add table public.beer_logs;
