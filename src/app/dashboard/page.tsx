@@ -26,6 +26,7 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [logs, setLogs] = useState<BeerLog[]>([]);
   const [allLogs, setAllLogs] = useState<BeerLog[]>([]);
+  const [groupLogs, setGroupLogs] = useState<BeerLog[]>([]);
   const [unlockedKeys, setUnlockedKeys] = useState<string[]>([]);
   const [challengePoints, setChallengePoints] = useState(0);
   const [completedChallenges, setCompletedChallenges] = useState(0);
@@ -46,6 +47,7 @@ export default function DashboardPage() {
         { data: myLogs },
         { data: achiev },
         { data: everyone },
+        { data: allGroupLogs },
         { data: completions },
       ] =
         await Promise.all([
@@ -62,8 +64,8 @@ export default function DashboardPage() {
           supabase
             .from("beer_logs")
             .select("*, profiles(player_name, avatar_url)")
-            .order("created_at", { ascending: false })
-            .limit(5),
+            .order("created_at", { ascending: false }),
+          supabase.from("beer_logs").select("*"),
           supabase
             .from("challenge_completions")
             .select("points")
@@ -77,6 +79,7 @@ export default function DashboardPage() {
       setProfile(prof);
       setLogs(myLogs ?? []);
       setAllLogs(everyone ?? []);
+      setGroupLogs(allGroupLogs ?? []);
       setUnlockedKeys(achiev?.map((a) => a.achievement_key) ?? []);
       setChallengePoints(
         (completions ?? []).reduce((sum, item) => sum + item.points, 0)
@@ -131,6 +134,15 @@ export default function DashboardPage() {
     { days: "Days 5–7", city: "Prague", icon: "🏰", theme: "The grand finale" },
   ];
   const topBeer = [...logs].sort((a, b) => b.rating - a.rating)[0];
+  const groupAverage = groupLogs.length
+    ? (groupLogs.reduce((sum, log) => sum + log.rating, 0) / groupLogs.length).toFixed(1)
+    : "—";
+  const groupPubs = new Set(
+    groupLogs.map((log) => log.bar_name?.trim().toLowerCase()).filter(Boolean)
+  ).size;
+  const groupPlayers = new Set(groupLogs.map((log) => log.user_id)).size;
+  const groupCities = new Set(groupLogs.map((log) => log.city).filter(Boolean)).size;
+  const groupTopBeer = [...groupLogs].sort((a, b) => b.rating - a.rating)[0];
   const favoriteCity = TRIP_CITIES.map((city) => ({
     city,
     count: logs.filter((log) => log.city === city).length,
@@ -419,7 +431,7 @@ export default function DashboardPage() {
               </Link>
             </p>
           ) : (
-            allLogs.map((log) => (
+            allLogs.slice(0, 5).map((log) => (
               <div key={log.id} className="flex items-start gap-3">
                 <div className="w-8 h-8 rounded-full bg-amber-700 flex items-center justify-center text-sm shrink-0 overflow-hidden">
                   {log.profiles?.avatar_url ? (
@@ -460,10 +472,10 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Trip recap */}
+      {/* Personal recap */}
       <Card className="bg-amber-800/50 border-amber-600">
         <CardHeader className="pb-2">
-          <CardTitle className="text-amber-100 text-base">Trip recap so far</CardTitle>
+          <CardTitle className="text-amber-100 text-base">My recap</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
@@ -484,6 +496,26 @@ export default function DashboardPage() {
             <Share2 size={16} /> Share recap
           </button>
           {shareMessage && <span className="ml-3 text-xs text-emerald-300">{shareMessage}</span>}
+        </CardContent>
+      </Card>
+
+      {/* Group recap */}
+      <Card className="bg-amber-900/60 border-amber-700">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-amber-100 text-base">Group recap</CardTitle>
+          <p className="text-xs text-amber-500">The whole crew&apos;s trip so far</p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3 text-center md:grid-cols-5">
+            <div><p className="text-xl font-bold text-amber-100">{groupLogs.length}</p><p className="text-xs text-amber-400">Beers</p></div>
+            <div><p className="text-xl font-bold text-amber-100">{groupAverage}</p><p className="text-xs text-amber-400">Avg rating</p></div>
+            <div><p className="text-xl font-bold text-amber-100">{groupPubs}</p><p className="text-xs text-amber-400">Pubs</p></div>
+            <div><p className="text-xl font-bold text-amber-100">{groupPlayers}</p><p className="text-xs text-amber-400">Players</p></div>
+            <div><p className="text-xl font-bold text-amber-100">{groupCities}/3</p><p className="text-xs text-amber-400">Cities</p></div>
+          </div>
+          <p className="mt-4 text-sm text-amber-300">
+            Group favourite so far: <span className="font-semibold">{groupTopBeer?.beer_name ?? "No beers yet"}</span>
+          </p>
         </CardContent>
       </Card>
 
