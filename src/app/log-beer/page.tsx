@@ -1,7 +1,7 @@
 "use client";
 export const dynamic = "force-dynamic";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import { BEER_STYLES, TRIP_CITIES, CZECH_BEERS } from "@/lib/utils";
 import { ACHIEVEMENTS, checkNewAchievements } from "@/lib/achievements";
 import { compressIfNeeded } from "@/lib/compress-image";
 import { BeerLog } from "@/lib/types";
-import { Beer, Star } from "lucide-react";
+import { Beer, Camera, ImagePlus, Star } from "lucide-react";
 
 export default function LogBeerPage() {
   const router = useRouter();
@@ -37,6 +37,8 @@ export default function LogBeerPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [newAchievements, setNewAchievements] = useState<string[]>([]);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -274,12 +276,42 @@ export default function LogBeerPage() {
 
             <div className="space-y-2">
               <Label className="text-amber-200">Photo</Label>
-              <Input
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+                className="hidden"
+              />
+              <input
+                ref={galleryInputRef}
                 type="file"
                 accept="image/*"
                 onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
-                className="bg-amber-900/50 border-amber-700 text-amber-100 file:text-amber-300 file:bg-amber-800 file:border-0 file:rounded file:mr-2 file:px-2 file:py-1 file:text-xs"
+                className="hidden"
               />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-500"
+                >
+                  <Camera size={18} />
+                  Take photo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-amber-700 bg-amber-900/60 px-4 py-2 text-sm font-semibold text-amber-200 hover:bg-amber-800"
+                >
+                  <ImagePlus size={18} />
+                  Choose from gallery
+                </button>
+              </div>
+              <p className="truncate text-xs text-amber-500">
+                {photo ? `Selected: ${photo.name}` : "No photo selected"}
+              </p>
             </div>
 
             {error && (
