@@ -8,6 +8,14 @@ import { MapBeerLog, Pub } from "@/lib/map-types";
 
 const tripCenter: [number, number] = [49.25, 14.35];
 
+const beerMarker = L.icon({
+  iconUrl: "/beer-marker.svg",
+  iconSize: [40, 48],
+  iconAnchor: [20, 47],
+  popupAnchor: [0, -44],
+  className: "beer-map-marker",
+});
+
 function FitToPubs({ pubs }: { pubs: Pub[] }) {
   const map = useMap();
 
@@ -32,7 +40,11 @@ export default function BeerMap({ pubs, logs }: { pubs: Pub[]; logs: MapBeerLog[
         {pubs.map((pub) => {
           const pubLogs = logs.filter((log) => log.pub_id === pub.id);
           return (
-            <Marker key={pub.id} position={[pub.latitude, pub.longitude]}>
+            <Marker
+              key={pub.id}
+              position={[pub.latitude, pub.longitude]}
+              icon={beerMarker}
+            >
               <Popup>
                 <strong>{pub.name}</strong>
                 <br />
