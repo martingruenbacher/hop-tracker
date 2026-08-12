@@ -17,9 +17,54 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { Beer, Star, MapPin, Trophy, Share2 } from "lucide-react";
+import { Beer, Star, MapPin, Trophy, Share2, Compass, Target } from "lucide-react";
 import Link from "next/link";
 import { ACHIEVEMENTS } from "@/lib/achievements";
+
+const dailyChallenges = [
+  {
+    icon: "🧭",
+    title: "Pub Scout",
+    description: "Visit 2 different named pubs today.",
+    target: 2,
+    progress: (logs: BeerLog[]) =>
+      new Set(logs.map((log) => log.bar_name?.trim().toLowerCase()).filter(Boolean)).size,
+  },
+  {
+    icon: "🎨",
+    title: "Style Explorer",
+    description: "Try 2 different beer styles today.",
+    target: 2,
+    progress: (logs: BeerLog[]) =>
+      new Set(logs.map((log) => log.style).filter(Boolean)).size,
+  },
+  {
+    icon: "📝",
+    title: "Tasting Panel",
+    description: "Give thoughtful ratings to 3 beers today.",
+    target: 3,
+    progress: (logs: BeerLog[]) => logs.length,
+  },
+  {
+    icon: "🏙️",
+    title: "City Specialist",
+    description: "Log 3 beers in the same city today.",
+    target: 3,
+    progress: (logs: BeerLog[]) => {
+      const counts = new Map<string, number>();
+      logs.forEach((log) => {
+        if (log.city) counts.set(log.city, (counts.get(log.city) ?? 0) + 1);
+      });
+      return Math.max(0, ...counts.values());
+    },
+  },
+] as const;
+
+function isToday(date: string) {
+  const value = new Date(date);
+  const today = new Date();
+  return value.toDateString() === today.toDateString();
+}
 
 export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -119,6 +164,18 @@ export default function DashboardPage() {
     count: logs.filter((log) => log.city === city).length,
   })).sort((a, b) => b.count - a.count)[0];
   const uniqueBars = new Set(logs.map((log) => log.bar_name).filter(Boolean)).size;
+  const todaysLogs = logs.filter((log) => isToday(log.created_at));
+  const challenge = dailyChallenges[new Date().getDate() % dailyChallenges.length];
+  const challengeProgress = Math.min(challenge.target, challenge.progress(todaysLogs));
+  const crawlByCity = TRIP_CITIES.map((city) => ({
+    city,
+    pubs: new Set(
+      logs
+        .filter((log) => log.city === city)
+        .map((log) => log.bar_name?.trim().toLowerCase())
+        .filter(Boolean)
+    ).size,
+  }));
 
   async function shareRecap() {
     const recap = `Hop Tracker recap: ${logs.length} beers, ${uniqueBars} pubs, ${avgRating} average rating. Top beer: ${topBeer?.beer_name ?? "TBD"}.`;
@@ -232,6 +289,71 @@ export default function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Daily challenge */}
+        <Card className="bg-amber-800/50 border-amber-600">
+          <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base text-amber-100">
+                <Target size={18} className="text-amber-300" />
+                Daily challenge
+              </CardTitle>
+              <p className="mt-1 text-xs text-amber-500">A new mission every day</p>
+            </div>
+            <span className="text-2xl">{challenge.icon}</span>
+          </CardHeader>
+          <CardContent>
+            <p className="font-semibold text-amber-100">{challenge.title}</p>
+            <p className="mt-1 text-sm text-amber-400">{challenge.description}</p>
+            <div className="mt-4 flex items-center gap-3">
+              <Progress
+                value={(challengeProgress / challenge.target) * 100}
+                className="h-3 flex-1 rounded-full bg-amber-950"
+                indicatorClassName="bg-emerald-400"
+              />
+              <span className="shrink-0 text-xs font-medium text-amber-200">
+                {challengeProgress}/{challenge.target}
+              </span>
+            </div>
+            {challengeProgress >= challenge.target && (
+              <p className="mt-3 text-xs font-medium text-emerald-300">Challenge complete!</p>
+            )}
+            {challengeProgress < challenge.target && (
+              <Link href="/log-beer" className="mt-3 inline-block text-xs text-amber-300 underline">
+                Log progress
+              </Link>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Pub crawl */}
+        <Card className="bg-amber-900/60 border-amber-700">
+          <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base text-amber-100">
+                <Compass size={18} className="text-amber-300" />
+                Pub crawl
+              </CardTitle>
+              <p className="mt-1 text-xs text-amber-500">Named pubs visited: {uniqueBars}</p>
+            </div>
+            <span className="text-2xl">🚶</span>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {crawlByCity.map(({ city, pubs }) => (
+              <div key={city} className="flex items-center justify-between rounded-lg bg-amber-950/40 px-3 py-2">
+                <span className="min-w-0 truncate text-sm text-amber-200">{city}</span>
+                <Badge variant="outline" className="ml-2 shrink-0 border-amber-700 text-xs text-amber-400">
+                  {pubs} {pubs === 1 ? "pub" : "pubs"}
+                </Badge>
+              </div>
+            ))}
+            <Link href="/log-beer" className="inline-block pt-1 text-xs text-amber-300 underline">
+              Add your next checkpoint
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Beers by city */}
