@@ -58,6 +58,67 @@ const dailyChallenges = [
       return Math.max(0, ...counts.values());
     },
   },
+  {
+    icon: "🚶",
+    title: "Pub Marathon",
+    description: "Visit 4 different named pubs today.",
+    target: 4,
+    progress: (logs: BeerLog[]) =>
+      new Set(logs.map((log) => log.bar_name?.trim().toLowerCase()).filter(Boolean)).size,
+  },
+  {
+    icon: "🏭",
+    title: "Brewery Flight",
+    description: "Try beers from 3 different breweries today.",
+    target: 3,
+    progress: (logs: BeerLog[]) =>
+      new Set(logs.map((log) => log.brewery?.trim().toLowerCase()).filter(Boolean)).size,
+  },
+  {
+    icon: "📸",
+    title: "Photo Journalist",
+    description: "Capture 3 beer photos today.",
+    target: 3,
+    progress: (logs: BeerLog[]) => logs.filter((log) => Boolean(log.photo_url)).length,
+  },
+  {
+    icon: "🌈",
+    title: "Variety Sprint",
+    description: "Log 4 different beers today.",
+    target: 4,
+    progress: (logs: BeerLog[]) =>
+      new Set(logs.map((log) => log.beer_name.trim().toLowerCase())).size,
+  },
+  {
+    icon: "🎨",
+    title: "Style Flight",
+    description: "Try 4 different beer styles today.",
+    target: 4,
+    progress: (logs: BeerLog[]) =>
+      new Set(logs.map((log) => log.style).filter(Boolean)).size,
+  },
+  {
+    icon: "⭐",
+    title: "Perfect Scores",
+    description: "Give 3 beers a 5-star rating today.",
+    target: 3,
+    progress: (logs: BeerLog[]) => logs.filter((log) => log.rating === 5).length,
+  },
+  {
+    icon: "🗺️",
+    title: "Grand Pub Tour",
+    description: "Visit 5 different named pubs today.",
+    target: 5,
+    progress: (logs: BeerLog[]) =>
+      new Set(logs.map((log) => log.bar_name?.trim().toLowerCase()).filter(Boolean)).size,
+  },
+  {
+    icon: "📝",
+    title: "Critics Circle",
+    description: "Write ratings for 6 beers today.",
+    target: 6,
+    progress: (logs: BeerLog[]) => logs.length,
+  },
 ] as const;
 
 function isToday(date: string) {
