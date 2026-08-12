@@ -11,12 +11,14 @@ import {
   Medal,
   User,
   LogOut,
+  Map,
 } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", mobileLabel: "Home", icon: LayoutDashboard },
   { href: "/log-beer", label: "Log Beer", mobileLabel: "Log", icon: Beer },
   { href: "/leaderboard", label: "Leaderboard", mobileLabel: "Board", icon: Trophy },
+  { href: "/map", label: "Beer Map", mobileLabel: "Map", icon: Map },
   { href: "/achievements", label: "Achievements", mobileLabel: "Badges", icon: Medal },
   { href: "/profile", label: "Profile", mobileLabel: "Me", icon: User },
 ];

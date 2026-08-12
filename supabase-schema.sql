@@ -20,8 +20,22 @@ create table public.beer_logs (
   bar_name text,
   notes text,
   photo_url text,
+  pub_id uuid,
   created_at timestamptz default now() not null
 );
+
+-- Optional map checkpoints
+create table public.pubs (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  city text not null check (city in ('Český Krumlov', 'České Budějovice', 'Prague')),
+  latitude double precision not null,
+  longitude double precision not null,
+  created_at timestamptz default now() not null
+);
+
+alter table public.beer_logs
+  add constraint beer_logs_pub_id_fkey foreign key (pub_id) references public.pubs(id) on delete set null;
 
 -- Achievements
 create table public.achievements (
@@ -46,6 +60,7 @@ create table public.challenge_completions (
 -- RLS policies
 alter table public.profiles enable row level security;
 alter table public.beer_logs enable row level security;
+alter table public.pubs enable row level security;
 alter table public.achievements enable row level security;
 alter table public.challenge_completions enable row level security;
 
@@ -79,6 +94,10 @@ create policy "Users can delete their own beer logs"
   on public.beer_logs for delete
   to authenticated using (auth.uid() = user_id);
 
+create policy "Mapped pubs are viewable by authenticated users"
+  on public.pubs for select
+  to authenticated using (true);
+
 -- Achievements: all authenticated can read, only owner can insert
 create policy "Achievements are viewable by authenticated users"
   on public.achievements for select
@@ -99,6 +118,15 @@ create policy "Challenge completions are viewable by authenticated users"
 create policy "Users can insert their own challenge completions"
   on public.challenge_completions for insert
   to authenticated with check (auth.uid() = user_id);
+
+-- Starter checkpoints; approximate coordinates keep the optional feature useful immediately.
+insert into public.pubs (name, city, latitude, longitude) values
+  ('Eggenberg Brewery', 'Český Krumlov', 48.8106, 14.3153),
+  ('Masne Kramy', 'České Budějovice', 48.9745, 14.4742),
+  ('Budvar Visitor Centre', 'České Budějovice', 48.9920, 14.4682),
+  ('U Fleku', 'Prague', 50.0812, 14.4183),
+  ('U Medvidku', 'Prague', 50.0835, 14.4186),
+  ('BeerGeek Bar', 'Prague', 50.0756, 14.4515);
 
 -- Enable live dashboard updates for beer logs
 alter publication supabase_realtime add table public.beer_logs;

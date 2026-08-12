@@ -1,7 +1,7 @@
 "use client";
 export const dynamic = "force-dynamic";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { BEER_STYLES, TRIP_CITIES, CZECH_BEERS } from "@/lib/utils";
 import { ACHIEVEMENTS, checkNewAchievements } from "@/lib/achievements";
 import { compressIfNeeded } from "@/lib/compress-image";
 import { BeerLog } from "@/lib/types";
+import { Pub } from "@/lib/map-types";
 import { Beer, Camera, ImagePlus, Star } from "lucide-react";
 import { getLocalDate, getTodayChallenge, isToday } from "@/lib/challenges";
 
@@ -33,6 +34,8 @@ export default function LogBeerPage() {
   const [hoverRating, setHoverRating] = useState(0);
   const [city, setCity] = useState("");
   const [barName, setBarName] = useState("");
+  const [pubId, setPubId] = useState("");
+  const [pubs, setPubs] = useState<Pub[]>([]);
   const [notes, setNotes] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -40,6 +43,16 @@ export default function LogBeerPage() {
   const [newAchievements, setNewAchievements] = useState<string[]>([]);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .from("pubs")
+      .select("*")
+      .order("city")
+      .order("name")
+      .then(({ data }) => setPubs((data as Pub[]) ?? []));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -80,6 +93,7 @@ export default function LogBeerPage() {
       rating,
       city: city || null,
       bar_name: barName || null,
+      pub_id: pubId || null,
       notes: notes || null,
       photo_url: photoUrl,
     });
@@ -238,6 +252,28 @@ export default function LogBeerPage() {
                 </Select>
               </div>
             </div>
+
+            {pubs.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-amber-200">Map checkpoint (optional)</Label>
+                <Select value={pubId} onValueChange={(v) => setPubId(v ?? "")}>
+                  <SelectTrigger className="bg-amber-900/50 border-amber-700 text-amber-100">
+                    <SelectValue placeholder="Select a mapped pub" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-amber-900 border-amber-700">
+                    {pubs.map((pub) => (
+                      <SelectItem
+                        key={pub.id}
+                        value={pub.id}
+                        className="text-amber-100 focus:bg-amber-700"
+                      >
+                        {pub.name} · {pub.city}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Star rating */}
             <div className="space-y-2">
