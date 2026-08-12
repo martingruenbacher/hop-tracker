@@ -159,16 +159,12 @@ export default function LeaderboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-amber-100 flex items-center gap-2">
-          <Trophy size={24} />
-          Leaderboard
-        </h1>
-        <p className="text-amber-400 text-sm mt-1">Who&apos;s winning?</p>
-      </div>
-
       <Tabs defaultValue="total">
-        <TabsList className="w-full h-auto min-h-10 justify-start overflow-x-auto bg-amber-900/60 border border-amber-700 p-1">
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-amber-500">
+            Rank by
+          </p>
+          <TabsList className="w-full h-auto min-h-10 justify-start overflow-x-auto bg-amber-900/60 border border-amber-700 p-1">
           <TabsTrigger
             value="total"
             className="shrink-0 px-2 sm:px-3 text-xs sm:text-sm data-[state=active]:bg-amber-700 text-amber-300 data-[state=active]:text-amber-100"
@@ -193,7 +189,16 @@ export default function LeaderboardPage() {
           >
             🏆
           </TabsTrigger>
-        </TabsList>
+          </TabsList>
+        </div>
+
+        <div>
+          <h1 className="text-2xl font-bold text-amber-100 flex items-center gap-2">
+            <Trophy size={24} />
+            Leaderboard
+          </h1>
+          <p className="text-amber-400 text-sm mt-1">Who&apos;s winning?</p>
+        </div>
 
         <TabsContent value="total" className="mt-4">
           <RankList
