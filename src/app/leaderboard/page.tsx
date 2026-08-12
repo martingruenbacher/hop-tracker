@@ -7,6 +7,7 @@ import { BeerLog, Profile } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Trophy } from "lucide-react";
+import { getLocalDate, getTodayChallenge, isToday } from "@/lib/challenges";
 
 interface PlayerStats {
   profile: Profile;
@@ -47,9 +48,11 @@ export default function LeaderboardPage() {
           supabase.from("profiles").select("*"),
           supabase
             .from("beer_logs")
-            .select("user_id, beer_name, rating, city, created_at"),
+            .select("*"),
           supabase.from("achievements").select("user_id"),
-          supabase.from("challenge_completions").select("user_id, points"),
+          supabase
+            .from("challenge_completions")
+            .select("user_id, points, challenge_key, challenge_date"),
         ]);
 
       if (!profiles) return;
@@ -64,6 +67,20 @@ export default function LeaderboardPage() {
         const myChallenges = (completions ?? []).filter(
           (completion: { user_id: string }) => completion.user_id === p.id
         );
+        const todayChallenge = getTodayChallenge();
+        const todaysLogs = (myLogs as BeerLog[]).filter((log) =>
+          isToday(log.created_at)
+        );
+        const hasPersistedTodayChallenge = myChallenges.some(
+          (completion: { challenge_key?: string; challenge_date?: string }) =>
+            completion.challenge_key === todayChallenge.key &&
+            completion.challenge_date === getLocalDate()
+        );
+        const currentChallengePoints =
+          !hasPersistedTodayChallenge &&
+          todayChallenge.progress(todaysLogs) >= todayChallenge.target
+            ? todayChallenge.points
+            : 0;
         return {
           profile: p,
           total: myLogs.length,
@@ -85,8 +102,9 @@ export default function LeaderboardPage() {
             (sum: number, completion: { points: number }) =>
               sum + completion.points,
             0
-          ),
-          challengesCompleted: myChallenges.length,
+          ) + currentChallengePoints,
+          challengesCompleted: myChallenges.length +
+            (currentChallengePoints > 0 ? 1 : 0),
         };
       });
 
