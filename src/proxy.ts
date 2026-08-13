@@ -2,6 +2,20 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
+  const publicAssetPaths = new Set([
+    "/sw.js",
+    "/manifest.webmanifest",
+    "/pwa-icon.svg",
+    "/pwa-icon-192.svg",
+    "/pwa-icon-512.svg",
+    "/pwa-icon-192.png",
+    "/pwa-icon-512.png",
+  ]);
+
+  if (publicAssetPaths.has(request.nextUrl.pathname)) {
+    return NextResponse.next({ request });
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
