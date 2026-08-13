@@ -429,22 +429,18 @@ export default function LogBeerPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label className="text-amber-200">City</Label>
-                <Select value={city} onValueChange={(v) => setCity(v ?? "")}>
-                  <SelectTrigger className="bg-amber-900/50 border-amber-700 text-amber-100">
-                    <SelectValue placeholder="Where are you?" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-amber-900 border-amber-700">
-                    {TRIP_CITIES.map((c) => (
-                      <SelectItem
-                        key={c}
-                        value={c}
-                        className="text-amber-100 focus:bg-amber-700"
-                      >
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="e.g. Prague, Brno, Vienna..."
+                  list="city-suggestions"
+                  className="bg-amber-900/50 border-amber-700 text-amber-100 placeholder:text-amber-600"
+                />
+                <datalist id="city-suggestions">
+                  {TRIP_CITIES.map((tripCity) => (
+                    <option key={tripCity} value={tripCity} />
+                  ))}
+                </datalist>
               </div>
               <div className="space-y-2">
                 <Label className="text-amber-200">Bar / Pub</Label>

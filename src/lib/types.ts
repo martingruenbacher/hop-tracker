@@ -1,4 +1,4 @@
-export type City = "Český Krumlov" | "České Budějovice" | "Prague";
+export type City = string;
 
 export interface Profile {
   id: string;

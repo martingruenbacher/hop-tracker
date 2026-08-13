@@ -18,7 +18,7 @@ create table public.beer_logs (
   brewery text,
   style text,
   rating integer not null check (rating between 1 and 5),
-  city text check (city in ('Český Krumlov', 'České Budějovice', 'Prague')),
+  city text,
   bar_name text,
   notes text,
   photo_url text,
@@ -30,7 +30,7 @@ create table public.beer_logs (
 create table public.pubs (
   id uuid default gen_random_uuid() primary key,
   name text not null,
-  city text not null check (city in ('Český Krumlov', 'České Budějovice', 'Prague')),
+  city text not null,
   latitude double precision not null,
   longitude double precision not null,
   created_at timestamptz default now() not null
