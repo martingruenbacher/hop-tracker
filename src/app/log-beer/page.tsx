@@ -17,12 +17,10 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BEER_STYLES, TRIP_CITIES, CZECH_BEERS } from "@/lib/utils";
-import { ACHIEVEMENTS, checkNewAchievements } from "@/lib/achievements";
+import { processBeerLog } from "@/lib/process-beer-log";
 import { compressIfNeeded } from "@/lib/compress-image";
-import { BeerLog } from "@/lib/types";
 import { Pub } from "@/lib/map-types";
 import { Beer, Camera, ImagePlus, LocateFixed, Search, Star } from "lucide-react";
-import { getLocalDate, getTodayChallenge, isToday } from "@/lib/challenges";
 import {
   getOfflineLogs,
   migrateLegacyOfflineLogs,
@@ -138,6 +136,7 @@ export default function LogBeerPage() {
           setSyncMessage("Some offline beers are waiting to sync.");
           break;
         }
+        await processBeerLog(supabase, user.id);
         await removeOfflineLog(queued.queueId);
       }
 
@@ -367,60 +366,9 @@ export default function LogBeerPage() {
       }
     }
 
-    // Check for new achievements
-    const { data: allLogs } = await supabase
-      .from("beer_logs")
-      .select("*")
-      .eq("user_id", user.id);
-
-    const today = getLocalDate();
-    const todayChallenge = getTodayChallenge();
-    const todaysLogs = ((allLogs as BeerLog[]) ?? []).filter((log) =>
-      isToday(log.created_at)
-    );
-    if (todayChallenge.progress(todaysLogs) >= todayChallenge.target) {
-      const { data: existingCompletion } = await supabase
-        .from("challenge_completions")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("challenge_key", todayChallenge.key)
-        .eq("challenge_date", today)
-        .maybeSingle();
-
-      if (!existingCompletion) {
-        const { error: completionError } = await supabase
-          .from("challenge_completions")
-          .insert({
-          user_id: user.id,
-          challenge_key: todayChallenge.key,
-          challenge_date: today,
-          points: todayChallenge.points,
-          });
-        if (completionError) {
-          setError(
-            `Challenge completed, but points could not be saved: ${completionError.message}`
-          );
-        }
-      }
-    }
-
-    const { data: existingAchievements } = await supabase
-      .from("achievements")
-      .select("achievement_key")
-      .eq("user_id", user.id);
-
-    const unlockedKeys =
-      existingAchievements?.map((a) => a.achievement_key) ?? [];
-    const newOnes = checkNewAchievements(
-      (allLogs as BeerLog[]) ?? [],
-      unlockedKeys
-    );
-
-    if (newOnes.length > 0) {
-      await supabase.from("achievements").insert(
-        newOnes.map((a) => ({ user_id: user.id, achievement_key: a.key }))
-      );
-      setNewAchievements(newOnes.map((a) => `${a.icon} ${a.title}`));
+    const newAchievementNames = await processBeerLog(supabase, user.id);
+    if (newAchievementNames.length > 0) {
+      setNewAchievements(newAchievementNames);
     } else {
       router.push("/dashboard");
     }
