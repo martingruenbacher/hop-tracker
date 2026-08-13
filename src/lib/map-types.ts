@@ -13,6 +13,7 @@ export interface MapBeerLog {
   beer_name: string;
   rating: number;
   city: City | null;
+  bar_name: string | null;
   pub_id: string | null;
   created_at: string;
   profiles?: { player_name: string } | { player_name: string }[] | null;

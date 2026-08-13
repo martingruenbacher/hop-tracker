@@ -33,7 +33,7 @@ export default function MapPage() {
           supabase.from("pubs").select("*").order("city").order("name"),
           supabase
             .from("beer_logs")
-            .select("id, beer_name, rating, city, pub_id, created_at, profiles(player_name)"),
+            .select("id, beer_name, rating, city, bar_name, pub_id, created_at, profiles(player_name)"),
         ]);
 
       if (pubError || logError) {
@@ -48,6 +48,7 @@ export default function MapPage() {
   }, []);
 
   const mappedBeers = logs.filter((log) => log.pub_id).length;
+  const unmappedLogs = logs.filter((log) => !log.pub_id && log.city);
   const cityCounts = TRIP_CITIES.map((city) => ({
     city,
     pubs: pubs.filter((pub) => pub.city === city).length,
@@ -90,6 +91,26 @@ export default function MapPage() {
       {!loading && pubs.length === 0 && !error && (
         <div className="rounded-xl border border-amber-700 bg-amber-900/50 p-5 text-center text-sm text-amber-400">
           No pub checkpoints yet. Add the optional map migration and seed pubs in Supabase.
+        </div>
+      )}
+
+      {!loading && unmappedLogs.length > 0 && (
+        <div className="rounded-xl border border-amber-700 bg-amber-900/50 p-4 text-sm text-amber-300">
+          <p className="font-medium text-amber-100">
+            {unmappedLogs.length} beer {unmappedLogs.length === 1 ? "log has" : "logs have"} no map checkpoint yet.
+          </p>
+          <p className="mt-1 text-xs text-amber-500">
+            A bar name alone cannot create a marker. When logging a beer, search for the bar and select the correct map result before saving.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {[...new Set(unmappedLogs.map((log) => `${log.bar_name ?? "Unnamed pub"} · ${log.city}`))]
+              .slice(0, 5)
+              .map((label) => (
+                <span key={label} className="rounded-md bg-amber-950/60 px-2 py-1 text-xs text-amber-400">
+                  {label}
+                </span>
+              ))}
+          </div>
         </div>
       )}
 
