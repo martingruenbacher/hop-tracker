@@ -50,6 +50,7 @@ export default function LogBeerPage() {
   const [barName, setBarName] = useState("");
   const [pubId, setPubId] = useState("");
   const [pubs, setPubs] = useState<Pub[]>([]);
+  const [pendingPub, setPendingPub] = useState<Omit<Pub, "id"> | null>(null);
   const [searchResults, setSearchResults] = useState<PubSearchResult[]>([]);
   const [searchingPubs, setSearchingPubs] = useState(false);
   const [searchError, setSearchError] = useState("");
@@ -107,7 +108,6 @@ export default function LogBeerPage() {
   }
 
   async function choosePub(result: PubSearchResult) {
-    const supabase = createClient();
     const name = result.name?.trim() || barName.trim();
     const resultCity = city || cityFromSearchResult(result);
     if (!resultCity) {
@@ -116,29 +116,17 @@ export default function LogBeerPage() {
       );
       return;
     }
-    const { data, error: insertError } = await supabase
-      .from("pubs")
-      .insert({
-        name,
-        city: resultCity,
-        latitude: Number(result.lat),
-        longitude: Number(result.lon),
-      })
-      .select("*")
-      .single();
-
-    if (insertError || !data) {
-      setSearchError(insertError?.message ?? "Could not save this map checkpoint.");
-      return;
-    }
-
-    const selectedPub = data as Pub;
-    setPubs((current) => [...current, selectedPub]);
-    setPubId(selectedPub.id);
+    setPendingPub({
+      name,
+      city: resultCity,
+      latitude: Number(result.lat),
+      longitude: Number(result.lon),
+    });
+    setPubId("");
     setCity(resultCity);
-    setBarName(selectedPub.name);
+    setBarName(name);
     setSearchResults([]);
-    setSearchError("Map checkpoint added and selected.");
+    setSearchError("Location selected. It will be added when this beer is saved.");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -172,7 +160,9 @@ export default function LogBeerPage() {
       }
     }
 
-    const { error: insertErr } = await supabase.from("beer_logs").insert({
+    const { data: savedBeer, error: insertErr } = await supabase
+      .from("beer_logs")
+      .insert({
       user_id: user.id,
       beer_name: beerName,
       brewery: brewery || null,
@@ -183,12 +173,34 @@ export default function LogBeerPage() {
       pub_id: pubId || null,
       notes: notes || null,
       photo_url: photoUrl,
-    });
+      })
+      .select("id")
+      .single();
 
-    if (insertErr) {
+    if (insertErr || !savedBeer) {
       setError(insertErr.message);
       setLoading(false);
       return;
+    }
+
+    if (pendingPub) {
+      const { data: savedPub, error: pubError } = await supabase
+        .from("pubs")
+        .insert(pendingPub)
+        .select("*")
+        .single();
+      if (pubError || !savedPub) {
+        setError(
+          `Beer saved, but the map location could not be added: ${
+            pubError?.message ?? "unknown error"
+          }`
+        );
+      } else {
+        await supabase
+          .from("beer_logs")
+          .update({ pub_id: savedPub.id })
+          .eq("id", savedBeer.id);
+      }
     }
 
     // Check for new achievements

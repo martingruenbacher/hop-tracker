@@ -47,11 +47,19 @@ export default function MapPage() {
     load();
   }, []);
 
+  const visiblePubs = pubs.filter((pub) =>
+    logs.some(
+      (log) =>
+        log.pub_id === pub.id ||
+        (log.bar_name?.trim().toLowerCase() === pub.name.trim().toLowerCase() &&
+          log.city?.trim().toLowerCase() === pub.city.trim().toLowerCase())
+    )
+  );
   const mappedBeers = logs.filter((log) => log.pub_id).length;
   const unmappedLogs = logs.filter((log) => !log.pub_id && log.city);
   const cityCounts = TRIP_CITIES.map((city) => ({
     city,
-    pubs: pubs.filter((pub) => pub.city === city).length,
+    pubs: visiblePubs.filter((pub) => pub.city === city).length,
   }));
 
   return (
@@ -88,7 +96,7 @@ export default function MapPage() {
         </p>
       )}
 
-      {!loading && pubs.length === 0 && !error && (
+      {!loading && visiblePubs.length === 0 && !error && (
         <div className="rounded-xl border border-amber-700 bg-amber-900/50 p-5 text-center text-sm text-amber-400">
           No pub checkpoints yet. Add the optional map migration and seed pubs in Supabase.
         </div>
@@ -115,7 +123,7 @@ export default function MapPage() {
       )}
 
       <div className="relative">
-        {!loading && pubs.length > 0 && <BeerMap pubs={pubs} logs={logs} />}
+        {!loading && visiblePubs.length > 0 && <BeerMap pubs={visiblePubs} logs={logs} />}
         {loading && (
           <div className="flex h-[min(68vh,620px)] min-h-[420px] items-center justify-center rounded-xl border border-amber-700 bg-amber-950/50 text-amber-400">
             Loading map...
