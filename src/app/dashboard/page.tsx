@@ -576,6 +576,12 @@ export default function DashboardPage() {
           <p className="mt-4 text-sm text-amber-300">
             Group favourite so far: <span className="font-semibold">{groupTopBeer?.beer_name ?? "No beers yet"}</span>
           </p>
+          <Link
+            href="/photos"
+            className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-amber-200 underline hover:text-white"
+          >
+            View the shared photo wall
+          </Link>
         </CardContent>
       </Card>
 

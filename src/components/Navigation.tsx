@@ -20,7 +20,7 @@ const navItems = [
   { href: "/log-beer", label: "Log Beer", mobileLabel: "Log", icon: Beer },
   { href: "/leaderboard", label: "Leaderboard", mobileLabel: "Board", icon: Trophy },
   { href: "/map", label: "Beer Map", mobileLabel: "Map", icon: Map },
-  { href: "/photos", label: "Photo Wall", mobileLabel: "Photos", icon: Camera },
+  { href: "/photos", label: "Photo Wall", mobileLabel: "Photos", icon: Camera, desktopOnly: true },
   { href: "/achievements", label: "Achievements", mobileLabel: "Badges", icon: Medal },
   { href: "/profile", label: "Profile", mobileLabel: "Me", icon: User },
 ];
@@ -56,7 +56,7 @@ export default function Navigation() {
 
       {/* Bottom tab bar for mobile */}
       <nav className="fixed bottom-0 left-0 right-0 bg-amber-900/95 backdrop-blur border-t border-amber-800 z-50 flex md:hidden">
-        {navItems.map(({ href, label, mobileLabel, icon: Icon }) => (
+        {navItems.filter((item) => !item.desktopOnly).map(({ href, mobileLabel, icon: Icon }) => (
           <Link
             key={href}
             href={href}
