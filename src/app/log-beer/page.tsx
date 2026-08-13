@@ -23,6 +23,7 @@ import { BeerLog } from "@/lib/types";
 import { Pub } from "@/lib/map-types";
 import { Beer, Camera, ImagePlus, LocateFixed, Search, Star } from "lucide-react";
 import { getLocalDate, getTodayChallenge, isToday } from "@/lib/challenges";
+import { getOfflineLogs, queueOfflineLog, removeOfflineLog } from "@/lib/offline-logs";
 
 interface PubSearchResult {
   display_name: string;
@@ -55,6 +56,9 @@ export default function LogBeerPage() {
   const [searchingPubs, setSearchingPubs] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [locating, setLocating] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+  const [offlineCount, setOfflineCount] = useState(0);
+  const [syncMessage, setSyncMessage] = useState("");
   const [notes, setNotes] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -64,6 +68,12 @@ export default function LogBeerPage() {
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    setIsOnline(navigator.onLine);
+    setOfflineCount(getOfflineLogs().length);
+    const updateOnlineState = () => setIsOnline(navigator.onLine);
+    window.addEventListener("online", updateOnlineState);
+    window.addEventListener("offline", updateOnlineState);
+
     const supabase = createClient();
     supabase
       .from("pubs")
@@ -71,7 +81,49 @@ export default function LogBeerPage() {
       .order("city")
       .order("name")
       .then(({ data }) => setPubs((data as Pub[]) ?? []));
+
+    return () => {
+      window.removeEventListener("online", updateOnlineState);
+      window.removeEventListener("offline", updateOnlineState);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!isOnline || getOfflineLogs().length === 0) return;
+
+    async function syncOfflineLogs() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      for (const queued of getOfflineLogs()) {
+        const { error: syncError } = await supabase.from("beer_logs").insert({
+          user_id: user.id,
+          beer_name: queued.beerName,
+          brewery: queued.brewery,
+          style: queued.style,
+          rating: queued.rating,
+          city: queued.city,
+          bar_name: queued.barName,
+          pub_id: queued.pubId,
+          notes: queued.notes,
+          photo_url: null,
+          created_at: queued.createdAt,
+        });
+        if (syncError) {
+          setSyncMessage("Some offline beers are waiting to sync.");
+          break;
+        }
+        removeOfflineLog(queued.queueId);
+      }
+
+      const remaining = getOfflineLogs().length;
+      setOfflineCount(remaining);
+      if (remaining === 0) setSyncMessage("Offline beers synced.");
+    }
+
+    syncOfflineLogs();
+  }, [isOnline]);
 
   async function searchForPub() {
     if (!barName.trim()) {
@@ -208,6 +260,30 @@ export default function LogBeerPage() {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
+
+    if (!navigator.onLine) {
+      if (photo) {
+        setError("Offline logging does not support photos yet. Remove the photo and try again.");
+        setLoading(false);
+        return;
+      }
+      queueOfflineLog({
+        userId: user.id,
+        beerName,
+        brewery: brewery || null,
+        style: style || null,
+        rating,
+        city: city || null,
+        barName: barName || null,
+        pubId: pubId || null,
+        notes: notes || null,
+        createdAt: new Date().toISOString(),
+      });
+      setOfflineCount(getOfflineLogs().length);
+      setSyncMessage("Beer saved on this phone and will sync when online.");
+      setLoading(false);
+      return;
+    }
 
     let photoUrl: string | null = null;
     if (photo) {
@@ -363,6 +439,22 @@ export default function LogBeerPage() {
         <p className="text-amber-400 text-sm mt-1">
           What are you drinking right now?
         </p>
+      </div>
+
+      <div className={`mb-4 rounded-lg border p-3 text-sm ${
+        isOnline
+          ? "border-emerald-800 bg-emerald-950/30 text-emerald-300"
+          : "border-amber-600 bg-amber-900/70 text-amber-200"
+      }`}>
+        <p className="font-medium">{isOnline ? "Online" : "Offline mode"}</p>
+        <p className="mt-1 text-xs opacity-80">
+          {isOnline
+            ? offlineCount > 0
+              ? `${offlineCount} offline ${offlineCount === 1 ? "beer is" : "beers are"} syncing.`
+              : "Beer logs save to the group immediately."
+            : "Logs without photos are saved on this phone and sync automatically when you reconnect."}
+        </p>
+        {syncMessage && <p className="mt-1 text-xs">{syncMessage}</p>}
       </div>
 
       <Card className="bg-amber-900/60 border-amber-700">
