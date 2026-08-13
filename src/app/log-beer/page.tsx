@@ -21,8 +21,15 @@ import { ACHIEVEMENTS, checkNewAchievements } from "@/lib/achievements";
 import { compressIfNeeded } from "@/lib/compress-image";
 import { BeerLog } from "@/lib/types";
 import { Pub } from "@/lib/map-types";
-import { Beer, Camera, ImagePlus, Star } from "lucide-react";
+import { Beer, Camera, ImagePlus, Search, Star } from "lucide-react";
 import { getLocalDate, getTodayChallenge, isToday } from "@/lib/challenges";
+
+interface PubSearchResult {
+  display_name: string;
+  lat: string;
+  lon: string;
+  name?: string;
+}
 
 export default function LogBeerPage() {
   const router = useRouter();
@@ -36,6 +43,9 @@ export default function LogBeerPage() {
   const [barName, setBarName] = useState("");
   const [pubId, setPubId] = useState("");
   const [pubs, setPubs] = useState<Pub[]>([]);
+  const [searchResults, setSearchResults] = useState<PubSearchResult[]>([]);
+  const [searchingPubs, setSearchingPubs] = useState(false);
+  const [searchError, setSearchError] = useState("");
   const [notes, setNotes] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -53,6 +63,65 @@ export default function LogBeerPage() {
       .order("name")
       .then(({ data }) => setPubs((data as Pub[]) ?? []));
   }, []);
+
+  async function searchForPub() {
+    if (!barName.trim() || !city) {
+      setSearchError("Enter a bar name and choose a city first.");
+      return;
+    }
+
+    setSearchingPubs(true);
+    setSearchError("");
+    setSearchResults([]);
+
+    try {
+      const query = encodeURIComponent(`${barName.trim()}, ${city}, Czech Republic`);
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=1&q=${query}`
+      );
+      if (!response.ok) throw new Error("The map search is unavailable right now.");
+      const results = (await response.json()) as PubSearchResult[];
+      setSearchResults(results);
+      if (results.length === 0) {
+        setSearchError("No matching places found. Try a shorter pub name.");
+      }
+    } catch (searchFailure) {
+      setSearchError(
+        searchFailure instanceof Error
+          ? searchFailure.message
+          : "Could not search for that pub."
+      );
+    } finally {
+      setSearchingPubs(false);
+    }
+  }
+
+  async function choosePub(result: PubSearchResult) {
+    const supabase = createClient();
+    const name = result.name?.trim() || barName.trim();
+    const { data, error: insertError } = await supabase
+      .from("pubs")
+      .insert({
+        name,
+        city,
+        latitude: Number(result.lat),
+        longitude: Number(result.lon),
+      })
+      .select("*")
+      .single();
+
+    if (insertError || !data) {
+      setSearchError(insertError?.message ?? "Could not save this map checkpoint.");
+      return;
+    }
+
+    const selectedPub = data as Pub;
+    setPubs((current) => [...current, selectedPub]);
+    setPubId(selectedPub.id);
+    setBarName(selectedPub.name);
+    setSearchResults([]);
+    setSearchError("Map checkpoint added and selected.");
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -274,6 +343,44 @@ export default function LogBeerPage() {
                 </Select>
               </div>
             )}
+
+            <div className="space-y-2">
+              <Label className="text-amber-200">Find a new bar for the map</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={barName}
+                  onChange={(e) => setBarName(e.target.value)}
+                  placeholder="Enter bar name, then search"
+                  className="min-w-0 flex-1 bg-amber-900/50 border-amber-700 text-amber-100 placeholder:text-amber-600"
+                />
+                <Button
+                  type="button"
+                  onClick={searchForPub}
+                  disabled={searchingPubs}
+                  className="shrink-0 bg-amber-700 px-3 hover:bg-amber-600"
+                  title="Search OpenStreetMap"
+                >
+                  <Search size={17} />
+                  <span className="hidden sm:inline">{searchingPubs ? "Searching" : "Search map"}</span>
+                </Button>
+              </div>
+              <p className="text-[11px] text-amber-600">Search powered by OpenStreetMap. Confirm the correct result before adding it.</p>
+              {searchError && <p className="text-xs text-amber-300">{searchError}</p>}
+              {searchResults.length > 0 && (
+                <div className="space-y-2 rounded-lg border border-amber-700 bg-amber-950/50 p-2">
+                  {searchResults.map((result) => (
+                    <button
+                      key={`${result.lat}-${result.lon}`}
+                      type="button"
+                      onClick={() => choosePub(result)}
+                      className="w-full rounded-md p-2 text-left text-xs text-amber-200 hover:bg-amber-800"
+                    >
+                      {result.display_name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Star rating */}
             <div className="space-y-2">

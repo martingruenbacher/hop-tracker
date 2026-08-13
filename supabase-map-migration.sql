@@ -42,6 +42,20 @@ begin
   end if;
 end $$;
 
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'pubs'
+      and policyname = 'Users can add mapped pubs'
+  ) then
+    create policy "Users can add mapped pubs"
+      on public.pubs for insert
+      to authenticated with check (true);
+  end if;
+end $$;
+
 insert into public.pubs (name, city, latitude, longitude)
 select * from (values
   ('Eggenberg Brewery', 'Český Krumlov', 48.8106, 14.3153),

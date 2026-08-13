@@ -98,6 +98,10 @@ create policy "Mapped pubs are viewable by authenticated users"
   on public.pubs for select
   to authenticated using (true);
 
+create policy "Users can add mapped pubs"
+  on public.pubs for insert
+  to authenticated with check (true);
+
 -- Achievements: all authenticated can read, only owner can insert
 create policy "Achievements are viewable by authenticated users"
   on public.achievements for select
