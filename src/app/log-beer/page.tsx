@@ -23,7 +23,12 @@ import { BeerLog } from "@/lib/types";
 import { Pub } from "@/lib/map-types";
 import { Beer, Camera, ImagePlus, LocateFixed, Search, Star } from "lucide-react";
 import { getLocalDate, getTodayChallenge, isToday } from "@/lib/challenges";
-import { getOfflineLogs, queueOfflineLog, removeOfflineLog } from "@/lib/offline-logs";
+import {
+  getOfflineLogs,
+  migrateLegacyOfflineLogs,
+  queueOfflineLog,
+  removeOfflineLog,
+} from "@/lib/offline-logs";
 
 interface PubSearchResult {
   display_name: string;
@@ -68,8 +73,12 @@ export default function LogBeerPage() {
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    async function initializeOfflineQueue() {
+      await migrateLegacyOfflineLogs();
+      setOfflineCount((await getOfflineLogs()).length);
+    }
     setIsOnline(navigator.onLine);
-    setOfflineCount(getOfflineLogs().length);
+    initializeOfflineQueue();
     const updateOnlineState = () => setIsOnline(navigator.onLine);
     window.addEventListener("online", updateOnlineState);
     window.addEventListener("offline", updateOnlineState);
@@ -89,14 +98,29 @@ export default function LogBeerPage() {
   }, []);
 
   useEffect(() => {
-    if (!isOnline || getOfflineLogs().length === 0) return;
+    async function shouldSync() {
+      return (await getOfflineLogs()).length > 0;
+    }
 
     async function syncOfflineLogs() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      for (const queued of getOfflineLogs()) {
+      for (const queued of await getOfflineLogs()) {
+        let photoUrl: string | null = null;
+        if (queued.photo) {
+          const extension = queued.photoName?.split(".").pop() ?? "jpg";
+          const path = `${user.id}/${Date.now()}.${extension}`;
+          const { error: uploadError } = await supabase.storage
+            .from("beer-photos")
+            .upload(path, queued.photo);
+          if (uploadError) {
+            setSyncMessage("Some offline beers are waiting to sync.");
+            break;
+          }
+          photoUrl = supabase.storage.from("beer-photos").getPublicUrl(path).data.publicUrl;
+        }
         const { error: syncError } = await supabase.from("beer_logs").insert({
           user_id: user.id,
           beer_name: queued.beerName,
@@ -107,22 +131,24 @@ export default function LogBeerPage() {
           bar_name: queued.barName,
           pub_id: queued.pubId,
           notes: queued.notes,
-          photo_url: null,
+          photo_url: photoUrl,
           created_at: queued.createdAt,
         });
         if (syncError) {
           setSyncMessage("Some offline beers are waiting to sync.");
           break;
         }
-        removeOfflineLog(queued.queueId);
+        await removeOfflineLog(queued.queueId);
       }
 
-      const remaining = getOfflineLogs().length;
+      const remaining = (await getOfflineLogs()).length;
       setOfflineCount(remaining);
       if (remaining === 0) setSyncMessage("Offline beers synced.");
     }
 
-    syncOfflineLogs();
+    shouldSync().then((hasLogs) => {
+      if (hasLogs) syncOfflineLogs();
+    });
   }, [isOnline]);
 
   async function searchForPub() {
@@ -262,12 +288,7 @@ export default function LogBeerPage() {
     if (!user) return;
 
     if (!navigator.onLine) {
-      if (photo) {
-        setError("Offline logging does not support photos yet. Remove the photo and try again.");
-        setLoading(false);
-        return;
-      }
-      queueOfflineLog({
+      await queueOfflineLog({
         userId: user.id,
         beerName,
         brewery: brewery || null,
@@ -278,8 +299,10 @@ export default function LogBeerPage() {
         pubId: pubId || null,
         notes: notes || null,
         createdAt: new Date().toISOString(),
+        photo: photo ?? undefined,
+        photoName: photo?.name,
       });
-      setOfflineCount(getOfflineLogs().length);
+      setOfflineCount((await getOfflineLogs()).length);
       setSyncMessage("Beer saved on this phone and will sync when online.");
       setLoading(false);
       return;
@@ -452,7 +475,7 @@ export default function LogBeerPage() {
             ? offlineCount > 0
               ? `${offlineCount} offline ${offlineCount === 1 ? "beer is" : "beers are"} syncing.`
               : "Beer logs save to the group immediately."
-            : "Logs without photos are saved on this phone and sync automatically when you reconnect."}
+            : "Beer logs and photos are saved on this phone and sync automatically when you reconnect."}
         </p>
         {syncMessage && <p className="mt-1 text-xs">{syncMessage}</p>}
       </div>
