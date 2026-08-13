@@ -21,6 +21,12 @@ import { Beer, Star, MapPin, Trophy, Share2, Compass, Target } from "lucide-reac
 import Link from "next/link";
 import { ACHIEVEMENTS } from "@/lib/achievements";
 import { getTodayChallenge, isToday } from "@/lib/challenges";
+import {
+  estimatePromille,
+  getPromilleSettings,
+  savePromilleSettings,
+  PromilleSettings,
+} from "@/lib/promille";
 
 export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -34,6 +40,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
+  const [now, setNow] = useState(() => new Date());
+  const [promilleSettings, setPromilleSettings] = useState<PromilleSettings>(() =>
+    getPromilleSettings()
+  );
 
   useEffect(() => {
     const supabase = createClient();
@@ -117,6 +127,11 @@ export default function DashboardPage() {
     };
   }, []);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   if (loading)
     return (
       <div className="flex items-center justify-center h-64 text-amber-400">
@@ -177,6 +192,13 @@ export default function DashboardPage() {
         .filter(Boolean)
     ).size,
   }));
+  const estimatedPromille = estimatePromille(logs, promilleSettings, now);
+
+  function updatePromilleSettings(next: Partial<PromilleSettings>) {
+    const updated = { ...promilleSettings, ...next };
+    setPromilleSettings(updated);
+    savePromilleSettings(updated);
+  }
 
   async function shareRecap() {
     const recap = `Hop Tracker recap: ${logs.length} beers, ${uniqueBars} pubs, ${avgRating} average rating. Top beer: ${topBeer?.beer_name ?? "TBD"}.`;
@@ -260,6 +282,61 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="border-amber-700 bg-amber-900/60">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base text-amber-100">
+            <span>⚠️</span>
+            Estimated current alcohol level
+          </CardTitle>
+          <p className="text-xs text-amber-500">
+            Rough promille estimate based on your logged beers and timestamps
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-4xl font-bold text-amber-200">
+                {estimatedPromille.toFixed(2)}‰
+              </p>
+              <p className="mt-1 text-xs text-amber-400">Estimated current level</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <label className="text-amber-400">
+                Weight (kg)
+                <input
+                  type="number"
+                  min="40"
+                  max="250"
+                  value={promilleSettings.weightKg}
+                  onChange={(event) =>
+                    updatePromilleSettings({ weightKg: Number(event.target.value) })
+                  }
+                  className="mt-1 w-20 rounded-md border border-amber-700 bg-amber-950/60 px-2 py-1 text-amber-100"
+                />
+              </label>
+              <label className="text-amber-400">
+                Formula
+                <select
+                  value={promilleSettings.sex}
+                  onChange={(event) =>
+                    updatePromilleSettings({
+                      sex: event.target.value as PromilleSettings["sex"],
+                    })
+                  }
+                  className="mt-1 w-24 rounded-md border border-amber-700 bg-amber-950/60 px-2 py-1 text-amber-100"
+                >
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <p className="mt-4 rounded-lg border border-red-900/70 bg-red-950/30 p-3 text-xs leading-5 text-red-300">
+            This is only a rough educational estimate. It assumes each beer is 500 ml at 5% ABV and a metabolism of 0.15‰ per hour. It does not account for food, timing inaccuracies, health, medication, or individual metabolism. Never use it to decide whether you can drive or make a safety decision.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Trip itinerary */}
       <Card className="bg-amber-900/60 border-amber-700">
