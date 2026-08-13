@@ -5,6 +5,8 @@ create table public.profiles (
   id uuid references auth.users on delete cascade primary key,
   player_name text not null unique,
   avatar_url text,
+  weight_kg numeric not null default 80,
+  sex text not null default 'male' check (sex in ('male', 'female')),
   created_at timestamptz default now() not null
 );
 

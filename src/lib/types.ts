@@ -4,6 +4,8 @@ export interface Profile {
   id: string;
   player_name: string;
   avatar_url: string | null;
+  weight_kg: number;
+  sex: "male" | "female";
   created_at: string;
 }
 

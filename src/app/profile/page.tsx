@@ -20,6 +20,8 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [logs, setLogs] = useState<BeerLog[]>([]);
   const [playerName, setPlayerName] = useState("");
+  const [weightKg, setWeightKg] = useState(80);
+  const [sex, setSex] = useState<Profile["sex"]>("male");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -53,6 +55,8 @@ export default function ProfilePage() {
       if (prof) {
         setProfile(prof);
         setPlayerName(prof.player_name);
+        setWeightKg(prof.weight_kg ?? 80);
+        setSex(prof.sex ?? "male");
       }
       setLogs(myLogs ?? []);
       setLoading(false);
@@ -92,12 +96,25 @@ export default function ProfilePage() {
     if (profile) {
       const { error: updateErr } = await supabase
         .from("profiles")
-        .update({ player_name: playerName, avatar_url: avatarUrl })
+        .update({
+          player_name: playerName,
+          avatar_url: avatarUrl,
+          weight_kg: weightKg,
+          sex,
+        })
         .eq("id", user.id);
       if (updateErr) {
         setError(updateErr.message);
       } else {
-        setProfile((p) => p && { ...p, player_name: playerName, avatar_url: avatarUrl });
+        setProfile((p) =>
+          p && {
+            ...p,
+            player_name: playerName,
+            avatar_url: avatarUrl,
+            weight_kg: weightKg,
+            sex,
+          }
+        );
         setSuccess("Profile updated!");
         if (isSetup) router.push("/dashboard");
       }
@@ -106,6 +123,8 @@ export default function ProfilePage() {
         id: user.id,
         player_name: playerName,
         avatar_url: avatarUrl,
+        weight_kg: weightKg,
+        sex,
       });
       if (insertErr) {
         setError(insertErr.message);
@@ -265,6 +284,35 @@ export default function ProfilePage() {
                 className="bg-amber-900/50 border-amber-700 text-amber-100 placeholder:text-amber-600"
               />
             </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="text-amber-200">Weight (kg)</Label>
+                <Input
+                  type="number"
+                  min="40"
+                  max="250"
+                  value={weightKg}
+                  onChange={(e) => setWeightKg(Number(e.target.value))}
+                  required
+                  className="bg-amber-900/50 border-amber-700 text-amber-100"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-amber-200">Promille formula</Label>
+                <select
+                  value={sex}
+                  onChange={(e) => setSex(e.target.value as Profile["sex"])}
+                  className="h-9 w-full rounded-md border border-amber-700 bg-amber-900/50 px-3 text-sm text-amber-100"
+                >
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                </select>
+              </div>
+            </div>
+            <p className="text-xs text-amber-500">
+              These settings personalize the rough dashboard estimate. They are not a safety measurement.
+            </p>
 
             {error && (
               <p className="text-red-400 text-sm bg-red-950/30 p-2 rounded">

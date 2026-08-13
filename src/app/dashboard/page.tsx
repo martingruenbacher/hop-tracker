@@ -23,8 +23,6 @@ import { ACHIEVEMENTS } from "@/lib/achievements";
 import { getTodayChallenge, isToday } from "@/lib/challenges";
 import {
   estimatePromille,
-  getPromilleSettings,
-  savePromilleSettings,
   PromilleSettings,
 } from "@/lib/promille";
 
@@ -41,9 +39,6 @@ export default function DashboardPage() {
   const [isLive, setIsLive] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
   const [now, setNow] = useState(() => new Date());
-  const [promilleSettings, setPromilleSettings] = useState<PromilleSettings>(() =>
-    getPromilleSettings()
-  );
 
   useEffect(() => {
     const supabase = createClient();
@@ -192,13 +187,11 @@ export default function DashboardPage() {
         .filter(Boolean)
     ).size,
   }));
+  const promilleSettings: PromilleSettings = {
+    weightKg: profile?.weight_kg ?? 80,
+    sex: profile?.sex ?? "male",
+  };
   const estimatedPromille = estimatePromille(logs, promilleSettings, now);
-
-  function updatePromilleSettings(next: Partial<PromilleSettings>) {
-    const updated = { ...promilleSettings, ...next };
-    setPromilleSettings(updated);
-    savePromilleSettings(updated);
-  }
 
   async function shareRecap() {
     const recap = `Hop Tracker recap: ${logs.length} beers, ${uniqueBars} pubs, ${avgRating} average rating. Top beer: ${topBeer?.beer_name ?? "TBD"}.`;
@@ -301,36 +294,10 @@ export default function DashboardPage() {
               </p>
               <p className="mt-1 text-xs text-amber-400">Estimated current level</p>
             </div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <label className="text-amber-400">
-                Weight (kg)
-                <input
-                  type="number"
-                  min="40"
-                  max="250"
-                  value={promilleSettings.weightKg}
-                  onChange={(event) =>
-                    updatePromilleSettings({ weightKg: Number(event.target.value) })
-                  }
-                  className="mt-1 w-20 rounded-md border border-amber-700 bg-amber-950/60 px-2 py-1 text-amber-100"
-                />
-              </label>
-              <label className="text-amber-400">
-                Formula
-                <select
-                  value={promilleSettings.sex}
-                  onChange={(event) =>
-                    updatePromilleSettings({
-                      sex: event.target.value as PromilleSettings["sex"],
-                    })
-                  }
-                  className="mt-1 w-24 rounded-md border border-amber-700 bg-amber-950/60 px-2 py-1 text-amber-100"
-                >
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                </select>
-              </label>
-            </div>
+            <p className="text-xs text-amber-500">
+              Based on your profile settings: {promilleSettings.weightKg} kg, {promilleSettings.sex} formula.
+              <Link href="/profile" className="ml-1 text-amber-300 underline">Update profile</Link>
+            </p>
           </div>
           <p className="mt-4 rounded-lg border border-red-900/70 bg-red-950/30 p-3 text-xs leading-5 text-red-300">
             This is only a rough educational estimate. It assumes each beer is 500 ml at 5% ABV and a metabolism of 0.15‰ per hour. It does not account for food, timing inaccuracies, health, medication, or individual metabolism. Never use it to decide whether you can drive or make a safety decision.
