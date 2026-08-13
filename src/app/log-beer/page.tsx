@@ -31,6 +31,13 @@ interface PubSearchResult {
   name?: string;
 }
 
+function cityFromSearchResult(result: PubSearchResult): string {
+  const match = TRIP_CITIES.find((tripCity) =>
+    result.display_name.toLowerCase().includes(tripCity.toLowerCase())
+  );
+  return match ?? "";
+}
+
 export default function LogBeerPage() {
   const router = useRouter();
 
@@ -65,8 +72,8 @@ export default function LogBeerPage() {
   }, []);
 
   async function searchForPub() {
-    if (!barName.trim() || !city) {
-      setSearchError("Enter a bar name and choose a city first.");
+    if (!barName.trim()) {
+      setSearchError("Enter a bar name first.");
       return;
     }
 
@@ -75,7 +82,10 @@ export default function LogBeerPage() {
     setSearchResults([]);
 
     try {
-      const query = encodeURIComponent(`${barName.trim()}, ${city}, Czech Republic`);
+      const locationHint = city ? `, ${city}` : "";
+      const query = encodeURIComponent(
+        `${barName.trim()}${locationHint}, Czech Republic`
+      );
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=1&q=${query}`
       );
@@ -99,11 +109,18 @@ export default function LogBeerPage() {
   async function choosePub(result: PubSearchResult) {
     const supabase = createClient();
     const name = result.name?.trim() || barName.trim();
+    const resultCity = city || cityFromSearchResult(result);
+    if (!resultCity) {
+      setSearchError(
+        "Choose the trip city for this result before adding it to the map."
+      );
+      return;
+    }
     const { data, error: insertError } = await supabase
       .from("pubs")
       .insert({
         name,
-        city,
+        city: resultCity,
         latitude: Number(result.lat),
         longitude: Number(result.lon),
       })
@@ -118,6 +135,7 @@ export default function LogBeerPage() {
     const selectedPub = data as Pub;
     setPubs((current) => [...current, selectedPub]);
     setPubId(selectedPub.id);
+    setCity(resultCity);
     setBarName(selectedPub.name);
     setSearchResults([]);
     setSearchError("Map checkpoint added and selected.");
@@ -364,7 +382,7 @@ export default function LogBeerPage() {
                   <span className="hidden sm:inline">{searchingPubs ? "Searching" : "Search map"}</span>
                 </Button>
               </div>
-              <p className="text-[11px] text-amber-600">Search powered by OpenStreetMap. Confirm the correct result before adding it.</p>
+              <p className="text-[11px] text-amber-600">City is optional for searching. Confirm the result and city before adding it.</p>
               {searchError && <p className="text-xs text-amber-300">{searchError}</p>}
               {searchResults.length > 0 && (
                 <div className="space-y-2 rounded-lg border border-amber-700 bg-amber-950/50 p-2">
