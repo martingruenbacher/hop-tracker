@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import React from "react";
 import { Geist } from "next/font/google";
 import "./globals.css";
+import PwaRegister from "@/components/PwaRegister";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -11,12 +12,29 @@ const geistSans = Geist({
 export const metadata: Metadata = {
   title: "Hop Tracker — Czech Republic 2026",
   description: "Beer logging app for the boys trip",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Hop Tracker",
+  },
+  icons: {
+    icon: "/pwa-icon.svg",
+    apple: "/pwa-icon.svg",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#78350f",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${geistSans.variable} h-full antialiased`}>
-      <body className="min-h-full bg-amber-950 text-amber-100">{children}</body>
+      <body className="min-h-full bg-amber-950 text-amber-100">
+        <PwaRegister />
+        {children}
+      </body>
     </html>
   );
 }
