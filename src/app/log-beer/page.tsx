@@ -21,7 +21,7 @@ import { ACHIEVEMENTS, checkNewAchievements } from "@/lib/achievements";
 import { compressIfNeeded } from "@/lib/compress-image";
 import { BeerLog } from "@/lib/types";
 import { Pub } from "@/lib/map-types";
-import { Beer, Camera, ImagePlus, Search, Star } from "lucide-react";
+import { Beer, Camera, ImagePlus, LocateFixed, Search, Star } from "lucide-react";
 import { getLocalDate, getTodayChallenge, isToday } from "@/lib/challenges";
 
 interface PubSearchResult {
@@ -54,6 +54,7 @@ export default function LogBeerPage() {
   const [searchResults, setSearchResults] = useState<PubSearchResult[]>([]);
   const [searchingPubs, setSearchingPubs] = useState(false);
   const [searchError, setSearchError] = useState("");
+  const [locating, setLocating] = useState(false);
   const [notes, setNotes] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -104,6 +105,54 @@ export default function LogBeerPage() {
       );
     } finally {
       setSearchingPubs(false);
+    }
+  }
+
+  async function useCurrentLocation() {
+    if (!navigator.geolocation) {
+      setSearchError("Location services are not available in this browser.");
+      return;
+    }
+
+    setLocating(true);
+    setSearchError("");
+
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 12_000,
+          maximumAge: 60_000,
+        })
+      );
+      const { latitude, longitude } = position.coords;
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
+      );
+      if (!response.ok) throw new Error("Could not identify your current place.");
+
+      const result = (await response.json()) as {
+        display_name?: string;
+        name?: string;
+        address?: { city?: string; town?: string; village?: string };
+      };
+      const detectedCity =
+        result.address?.city ?? result.address?.town ?? result.address?.village ?? "";
+      const detectedName = result.name ?? "Current location";
+
+      setBarName(detectedName);
+      if (detectedCity) setCity(detectedCity);
+      setSearchError(
+        `${detectedName}${detectedCity ? `, ${detectedCity}` : ""} detected. Search the map to confirm the pub.`
+      );
+    } catch (locationError) {
+      setSearchError(
+        locationError instanceof GeolocationPositionError && locationError.code === 1
+          ? "Location permission was denied. Enable it in your browser settings."
+          : "Could not determine your current location. Try searching by pub name."
+      );
+    } finally {
+      setLocating(false);
     }
   }
 
@@ -383,6 +432,16 @@ export default function LogBeerPage() {
                   placeholder="Enter bar name, then search"
                   className="min-w-0 flex-1 bg-amber-900/50 border-amber-700 text-amber-100 placeholder:text-amber-600"
                 />
+                <Button
+                  type="button"
+                  onClick={useCurrentLocation}
+                  disabled={locating}
+                  className="shrink-0 border border-amber-700 bg-amber-900 px-3 text-amber-200 hover:bg-amber-800"
+                  title="Use current phone location"
+                >
+                  <LocateFixed size={17} />
+                  <span className="hidden sm:inline">{locating ? "Locating" : "GPS"}</span>
+                </Button>
                 <Button
                   type="button"
                   onClick={searchForPub}
