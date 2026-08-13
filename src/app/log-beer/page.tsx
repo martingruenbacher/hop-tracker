@@ -133,17 +133,33 @@ export default function LogBeerPage() {
 
       const result = (await response.json()) as {
         display_name?: string;
-        name?: string;
-        address?: { city?: string; town?: string; village?: string };
+        address?: {
+          road?: string;
+          house_number?: string;
+          city?: string;
+          town?: string;
+          village?: string;
+          municipality?: string;
+        };
       };
       const detectedCity =
-        result.address?.city ?? result.address?.town ?? result.address?.village ?? "";
-      const detectedName = result.name ?? "Current location";
+        result.address?.city ??
+        result.address?.town ??
+        result.address?.village ??
+        result.address?.municipality ??
+        "";
+      const detectedAddress = [
+        result.address?.road,
+        result.address?.house_number,
+      ]
+        .filter(Boolean)
+        .join(" ");
+      const address = detectedAddress || result.display_name || "Current address";
 
-      setBarName(detectedName);
+      setBarName(address);
       if (detectedCity) setCity(detectedCity);
       setSearchError(
-        `${detectedName}${detectedCity ? `, ${detectedCity}` : ""} detected. Search the map to confirm the pub.`
+        `${address}${detectedCity ? `, ${detectedCity}` : ""} detected. Search the map to confirm the location.`
       );
     } catch (locationError) {
       setSearchError(
@@ -424,12 +440,12 @@ export default function LogBeerPage() {
             )}
 
             <div className="space-y-2">
-              <Label className="text-amber-200">Find a new bar for the map</Label>
+              <Label className="text-amber-200">Find an address for the map</Label>
               <div className="flex gap-2">
                 <Input
                   value={barName}
                   onChange={(e) => setBarName(e.target.value)}
-                  placeholder="Enter bar name, then search"
+                  placeholder="Enter an address or bar name"
                   className="min-w-0 flex-1 bg-amber-900/50 border-amber-700 text-amber-100 placeholder:text-amber-600"
                 />
                 <Button
