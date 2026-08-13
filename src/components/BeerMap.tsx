@@ -6,6 +6,10 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { MapBeerLog, Pub } from "@/lib/map-types";
 
+function normalizePlace(value: string | null | undefined) {
+  return value?.trim().toLowerCase().replace(/\s+/g, " ") ?? "";
+}
+
 const tripCenter: [number, number] = [49.25, 14.35];
 
 const beerMarker = L.icon({
@@ -38,7 +42,12 @@ export default function BeerMap({ pubs, logs }: { pubs: Pub[]; logs: MapBeerLog[
         />
         <FitToPubs pubs={pubs} />
         {pubs.map((pub) => {
-          const pubLogs = logs.filter((log) => log.pub_id === pub.id);
+          const pubLogs = logs.filter(
+            (log) =>
+              log.pub_id === pub.id ||
+              (normalizePlace(log.bar_name) === normalizePlace(pub.name) &&
+                normalizePlace(log.city) === normalizePlace(pub.city))
+          );
           return (
             <Marker
               key={pub.id}
