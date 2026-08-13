@@ -19,8 +19,8 @@ export const metadata: Metadata = {
     title: "Hop Tracker",
   },
   icons: {
-    icon: "/pwa-icon.svg",
-    apple: "/pwa-icon.svg",
+    icon: "/pwa-icon-192.png",
+    apple: "/pwa-icon-192.png",
   },
 };
 
