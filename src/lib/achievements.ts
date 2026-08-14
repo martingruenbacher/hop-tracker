@@ -1,4 +1,4 @@
-import { AchievementDefinition, BeerLog } from "@/lib/types";
+import { AchievementContext, AchievementDefinition, BeerLog, Profile } from "@/lib/types";
 
 function logsOnSameDay(logs: BeerLog[], date: Date): BeerLog[] {
   return logs.filter((l) => {
@@ -27,6 +27,46 @@ function uniqueBarsOnDay(logs: BeerLog[], date: Date): number {
       .filter(Boolean)
   );
   return bars.size;
+}
+
+function allPlayersLoggedWithinFiveMinutes(logs: BeerLog[], playerIds: string[]) {
+  if (playerIds.length === 0) return false;
+  const timestampsByPlayer = new Map<string, number[]>();
+  logs.forEach((log) => {
+    const timestamps = timestampsByPlayer.get(log.user_id) ?? [];
+    timestamps.push(new Date(log.created_at).getTime());
+    timestampsByPlayer.set(log.user_id, timestamps);
+  });
+
+  const playerTimestamps = [...timestampsByPlayer.values()];
+  if (playerTimestamps.length < playerIds.length) return false;
+  const allTimes = [...new Set(playerTimestamps.flat())].sort((a, b) => a - b);
+  for (let start = 0; start < allTimes.length; start += 1) {
+    const windowEnd = allTimes[start] + 5 * 60 * 1000;
+    const playersInWindow = new Set(
+      logs
+        .filter((log) => {
+          const timestamp = new Date(log.created_at).getTime();
+          return timestamp >= allTimes[start] && timestamp <= windowEnd;
+        })
+        .map((log) => log.user_id)
+    );
+    if (playerIds.every((playerId) => playersInWindow.has(playerId))) return true;
+  }
+  return false;
+}
+
+function uniquePhotoOwnersReactedTo(
+  context: AchievementContext,
+  userId: string
+) {
+  const logOwners = new Map(context.allLogs.map((log) => [log.id, log.user_id]));
+  return new Set(
+    context.reactions
+      .filter((reaction) => reaction.user_id === userId)
+      .map((reaction) => logOwners.get(reaction.beer_log_id))
+      .filter((ownerId): ownerId is string => Boolean(ownerId && ownerId !== userId))
+  ).size;
 }
 
 export const ACHIEVEMENTS: AchievementDefinition[] = [
@@ -285,13 +325,58 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
       return days.size >= 7;
     },
   },
+
+  // ── Hidden group achievements ─────────────────────────────────────────────
+  {
+    key: "five_minute_crew",
+    title: "Five-Minute Crew",
+    description: "All players logged a beer within the same five-minute window.",
+    icon: "⚡",
+    hidden: true,
+    check: (logs, _profile, context) =>
+      Boolean(context && allPlayersLoggedWithinFiveMinutes(context.allLogs, context.playerIds)),
+  },
+  ...[20, 50, 100, 150, 200, 250].map((threshold) => ({
+    key: `crew_${threshold}`,
+    title: `Crew ${threshold}`,
+    description: `The group collectively logged ${threshold} beers.`,
+    icon: threshold >= 100 ? "🏆" : "🍻",
+    hidden: true,
+    check: (logs: BeerLog[], _profile: Profile, context?: AchievementContext) =>
+      (context?.allLogs.length ?? logs.length) >= threshold,
+  })),
+  {
+    key: "czech_formation",
+    title: "Czech Formation",
+    description: "The group collectively logged beers in all three cities.",
+    icon: "🇨🇿",
+    hidden: true,
+    check: (_logs, _profile, context) => {
+      const cities = new Set(context?.allLogs.map((log) => log.city));
+      return Boolean(
+        cities.has("Český Krumlov") &&
+          cities.has("České Budějovice") &&
+          cities.has("Prague")
+      );
+    },
+  },
+  {
+    key: "social_butterfly",
+    title: "Social Butterfly",
+    description: "React to photos from 20 different players.",
+    icon: "🦋",
+    hidden: true,
+    check: (_logs, _profile, context) =>
+      Boolean(context && uniquePhotoOwnersReactedTo(context, context.currentUserId) >= 20),
+  },
 ];
 
 export function checkNewAchievements(
   logs: BeerLog[],
-  unlockedKeys: string[]
+  unlockedKeys: string[],
+  context?: AchievementContext
 ): AchievementDefinition[] {
   return ACHIEVEMENTS.filter(
-    (a) => !unlockedKeys.includes(a.key) && a.check(logs, {} as never)
+    (a) => !unlockedKeys.includes(a.key) && a.check(logs, {} as never, context)
   );
 }

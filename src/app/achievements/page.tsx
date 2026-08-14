@@ -61,6 +61,7 @@ export default function AchievementsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {ACHIEVEMENTS.map((a) => {
           const isUnlocked = !!unlockedMap[a.key];
+          const isHidden = Boolean(a.hidden && !isUnlocked);
           return (
             <Card
               key={a.key}
@@ -78,7 +79,7 @@ export default function AchievementsPage() {
                     isUnlocked ? "bg-amber-700" : "bg-amber-900 grayscale"
                   )}
                 >
-                  {a.icon}
+                  {isHidden ? "❔" : a.icon}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p
@@ -87,10 +88,10 @@ export default function AchievementsPage() {
                       isUnlocked ? "text-amber-100" : "text-amber-500"
                     )}
                   >
-                    {a.title}
+                      {isHidden ? "Secret achievement" : a.title}
                   </p>
                   <p className="text-xs text-amber-400 mt-0.5">
-                    {a.description}
+                    {isHidden ? "Keep playing to discover this one." : a.description}
                   </p>
                   {isUnlocked && (
                     <p className="text-xs text-amber-600 mt-1">

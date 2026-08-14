@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { Camera, ChevronLeft, ChevronRight, Download, Image as ImageIcon, Trophy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { processBeerLog } from "@/lib/process-beer-log";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TRIP_CITIES } from "@/lib/utils";
@@ -61,6 +62,7 @@ export default function PhotosPage() {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [achievementNotice, setAchievementNotice] = useState<string[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -228,6 +230,12 @@ export default function PhotosPage() {
       });
       if (insertError) setError(insertError.message);
     }
+
+    const newAchievements = await processBeerLog(supabase, userId);
+    if (newAchievements.length > 0) {
+      setAchievementNotice(newAchievements);
+      window.setTimeout(() => setAchievementNotice([]), 6000);
+    }
   }
 
   return (
@@ -263,6 +271,14 @@ export default function PhotosPage() {
       </div>
 
       {error && <p className="rounded-lg border border-red-800 bg-red-950/40 p-3 text-sm text-red-300">{error}</p>}
+      {achievementNotice.length > 0 && (
+        <div className="rounded-lg border border-amber-400 bg-amber-800/80 p-4 text-amber-100 shadow-lg">
+          <p className="font-semibold">Achievement unlocked!</p>
+          {achievementNotice.map((achievement) => (
+            <p key={achievement} className="mt-1 text-sm text-amber-200">{achievement}</p>
+          ))}
+        </div>
+      )}
       {loading && <p className="py-10 text-center text-amber-400">Loading photos...</p>}
       {!loading && photoOfTheDay && (
         <Card className="overflow-hidden border-amber-500 bg-amber-800/60">

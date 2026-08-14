@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { ACHIEVEMENTS, checkNewAchievements } from "@/lib/achievements";
+import { checkNewAchievements } from "@/lib/achievements";
 import { getLocalDate, getTodayChallenge, isToday } from "@/lib/challenges";
 import { BeerLog } from "@/lib/types";
 
@@ -7,12 +7,17 @@ export async function processBeerLog(
   supabase: SupabaseClient,
   userId: string
 ): Promise<string[]> {
-  const { data: allLogs } = await supabase
-    .from("beer_logs")
-    .select("*")
-    .eq("user_id", userId);
+  const [
+    { data: allLogs },
+    { data: profiles },
+    { data: reactions },
+  ] = await Promise.all([
+    supabase.from("beer_logs").select("*"),
+    supabase.from("profiles").select("id"),
+    supabase.from("photo_reactions").select("user_id, beer_log_id"),
+  ]);
 
-  const logs = (allLogs as BeerLog[]) ?? [];
+  const logs = (allLogs as BeerLog[] ?? []).filter((log) => log.user_id === userId);
   const todayChallenge = getTodayChallenge();
   const todaysLogs = logs.filter((log) => isToday(log.created_at));
 
@@ -41,7 +46,12 @@ export async function processBeerLog(
     .select("achievement_key")
     .eq("user_id", userId);
   const unlockedKeys = existingAchievements?.map((a) => a.achievement_key) ?? [];
-  const newOnes = checkNewAchievements(logs, unlockedKeys);
+  const newOnes = checkNewAchievements(logs, unlockedKeys, {
+    allLogs: (allLogs as BeerLog[]) ?? [],
+    playerIds: (profiles ?? []).map((profile) => profile.id),
+    reactions: reactions ?? [],
+    currentUserId: userId,
+  });
 
   if (newOnes.length > 0) {
     await supabase.from("achievements").insert(

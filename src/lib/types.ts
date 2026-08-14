@@ -24,6 +24,13 @@ export interface BeerLog {
   profiles?: Profile;
 }
 
+export interface AchievementContext {
+  allLogs: BeerLog[];
+  playerIds: string[];
+  reactions: { user_id: string; beer_log_id: string }[];
+  currentUserId: string;
+}
+
 export interface Achievement {
   id: string;
   user_id: string;
@@ -45,7 +52,8 @@ export interface AchievementDefinition {
   title: string;
   description: string;
   icon: string;
-  check: (logs: BeerLog[], profile: Profile) => boolean;
+  hidden?: boolean;
+  check: (logs: BeerLog[], profile: Profile, context?: AchievementContext) => boolean;
 }
 
 export interface LeaderboardEntry {
