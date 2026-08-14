@@ -83,6 +83,32 @@ export default function PhotosPage() {
     setSelectedPhotoIndex((selectedPhotoIndex + 1) % filteredPhotos.length);
   };
 
+  async function downloadPhoto(url: string, title: string) {
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error("Download failed");
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = blobUrl;
+      anchor.download = `${(title || "beer-photo").replace(/\s+/g, "-").toLowerCase()}.jpg`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      const fallback = document.createElement("a");
+      fallback.href = url;
+      fallback.download = `${(title || "beer-photo").replace(/\s+/g, "-").toLowerCase()}.jpg`;
+      fallback.target = "_blank";
+      fallback.rel = "noopener noreferrer";
+      document.body.appendChild(fallback);
+      fallback.click();
+      document.body.removeChild(fallback);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <header className="flex items-center gap-3">
@@ -140,17 +166,15 @@ export default function PhotosPage() {
                   <p className="truncate text-sm font-semibold text-amber-100">{photo.beer_name}</p>
                   <p className="truncate text-xs text-amber-400">{playerName(photo)}</p>
                 </div>
-                <a
-                  href={photo.photo_url}
-                  download
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => void downloadPhoto(photo.photo_url, photo.beer_name)}
                   className="inline-flex items-center justify-center rounded-md border border-amber-600 bg-amber-800/80 px-2 py-1 text-[10px] font-medium text-amber-100 transition-colors hover:bg-amber-700"
                   aria-label={`Download ${photo.beer_name} photo`}
                 >
                   <Download size={12} className="mr-1" />
-                  Save
-                </a>
+                  Download
+                </button>
               </div>
               <p className="mt-1 text-xs text-amber-300">{"★".repeat(photo.rating)}</p>
               <p className="truncate text-xs text-amber-500">{photo.bar_name ?? photo.city ?? "Unknown place"}</p>
@@ -197,16 +221,14 @@ export default function PhotosPage() {
                 <div className="text-sm text-amber-400">
                   {selectedPhoto.bar_name ?? "Unknown bar"}
                 </div>
-                <a
-                  href={selectedPhoto.photo_url}
-                  download
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => void downloadPhoto(selectedPhoto.photo_url, selectedPhoto.beer_name)}
                   className="inline-flex items-center gap-2 rounded-md border border-amber-600 bg-amber-800/80 px-3 py-2 text-sm font-medium text-amber-100 transition-colors hover:bg-amber-700"
                 >
                   <Download size={14} />
-                  Download photo
-                </a>
+                  Download
+                </button>
               </div>
             </div>
           </DialogContent>
