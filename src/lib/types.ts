@@ -29,6 +29,10 @@ export interface AchievementContext {
   playerIds: string[];
   reactions: { user_id: string; beer_log_id: string }[];
   currentUserId: string;
+  isTripFinalDay?: boolean;
+  leaderboardGhost?: boolean;
+  underdog?: boolean;
+  plotArmor?: boolean;
 }
 
 export interface Achievement {

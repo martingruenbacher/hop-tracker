@@ -69,6 +69,60 @@ function uniquePhotoOwnersReactedTo(
   ).size;
 }
 
+function normalized(value: string | null | undefined) {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+function latestLogForPlayer(logs: BeerLog[], userId: string) {
+  return [...logs]
+    .filter((log) => log.user_id === userId)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+}
+
+function latestLogByOtherPlayers(logs: BeerLog[], userId: string) {
+  return logs
+    .filter((log) => log.user_id !== userId)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+}
+
+function currentUserHasUniqueBrewery(logs: BeerLog[], userId: string) {
+  const ownBreweries = new Set(
+    logs.filter((log) => log.user_id === userId).map((log) => normalized(log.brewery)).filter(Boolean)
+  );
+  const otherBreweries = new Set(
+    logs.filter((log) => log.user_id !== userId).map((log) => normalized(log.brewery)).filter(Boolean)
+  );
+  return [...ownBreweries].some((brewery) => !otherBreweries.has(brewery));
+}
+
+function currentUserWasFirstAtPub(logs: BeerLog[], userId: string) {
+  const firstByPub = new Map<string, BeerLog>();
+  [...logs]
+    .filter((log) => log.bar_name)
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    .forEach((log) => {
+      const pubKey = `${normalized(log.bar_name)}|${normalized(log.city)}`;
+      if (!firstByPub.has(pubKey)) firstByPub.set(pubKey, log);
+    });
+  return [...firstByPub.values()].some((log) => log.user_id === userId);
+}
+
+function currentUserHasLongWayRound(logs: BeerLog[], userId: string) {
+  const pubsByCity = new Map<string, Set<string>>();
+  logs.filter((log) => log.user_id === userId && log.city && log.bar_name).forEach((log) => {
+    const pubs = pubsByCity.get(log.city!) ?? new Set<string>();
+    pubs.add(normalized(log.bar_name));
+    pubsByCity.set(log.city!, pubs);
+  });
+  const cities = [...pubsByCity.keys()];
+  for (let first = 0; first < cities.length; first += 1) {
+    for (let second = first + 1; second < cities.length; second += 1) {
+      if ((pubsByCity.get(cities[first])?.size ?? 0) + (pubsByCity.get(cities[second])?.size ?? 0) >= 5) return true;
+    }
+  }
+  return false;
+}
+
 export const ACHIEVEMENTS: AchievementDefinition[] = [
   // ── Getting started ────────────────────────────────────────────────────────
   {
@@ -368,6 +422,149 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     hidden: true,
     check: (_logs, _profile, context) =>
       Boolean(context && uniquePhotoOwnersReactedTo(context, context.currentUserId) >= 20),
+  },
+  {
+    key: "local_treasure",
+    title: "Local Treasure",
+    description: "Log a beer from a brewery nobody else has logged.",
+    icon: "💎",
+    hidden: true,
+    check: (_logs, _profile, context) =>
+      Boolean(context && currentUserHasUniqueBrewery(context.allLogs, context.currentUserId)),
+  },
+  {
+    key: "pub_pioneer",
+    title: "Pub Pioneer",
+    description: "Be the first player to log a pub.",
+    icon: "🚩",
+    hidden: true,
+    check: (_logs, _profile, context) =>
+      Boolean(context && currentUserWasFirstAtPub(context.allLogs, context.currentUserId)),
+  },
+  {
+    key: "last_call_explorer",
+    title: "Last Call Explorer",
+    description: "Log a beer at a pub after every other player has stopped.",
+    icon: "🌃",
+    hidden: true,
+    check: (_logs, _profile, context) => {
+      if (!context?.isTripFinalDay) return false;
+      const ownLatest = latestLogForPlayer(context.allLogs, context.currentUserId);
+      const otherLatest = latestLogByOtherPlayers(context.allLogs, context.currentUserId);
+      return Boolean(
+        ownLatest &&
+          otherLatest &&
+          ownLatest.bar_name &&
+          new Date(ownLatest.created_at).getTime() > new Date(otherLatest.created_at).getTime()
+      );
+    },
+  },
+  {
+    key: "long_way_round",
+    title: "The Long Way Round",
+    description: "Visit five different pubs across two cities.",
+    icon: "🛣️",
+    hidden: true,
+    check: (_logs, _profile, context) =>
+      Boolean(context && currentUserHasLongWayRound(context.allLogs, context.currentUserId)),
+  },
+  {
+    key: "the_optimist",
+    title: "The Optimist",
+    description: "Give five beers a 5-star rating.",
+    icon: "🌞",
+    hidden: true,
+    check: (logs) => logs.filter((log) => log.rating === 5).length >= 5,
+  },
+  {
+    key: "the_skeptic",
+    title: "The Skeptic",
+    description: "Give five beers a 1- or 2-star rating.",
+    icon: "🧐",
+    hidden: true,
+    check: (logs) => logs.filter((log) => log.rating <= 2).length >= 5,
+  },
+  {
+    key: "alphabet_pour",
+    title: "Alphabet Pour",
+    description: "Log beers beginning with five different letters.",
+    icon: "🔤",
+    hidden: true,
+    check: (logs) => new Set(logs.map((log) => normalized(log.beer_name).charAt(0)).filter(Boolean)).size >= 5,
+  },
+  {
+    key: "perfect_timing",
+    title: "Perfect Timing",
+    description: "Log a beer exactly one hour after another beer.",
+    icon: "🎯",
+    hidden: true,
+    check: (logs) => {
+      const times = logs.map((log) => new Date(log.created_at).getTime());
+      return times.some((time, index) => times.some((other, otherIndex) => index !== otherIndex && Math.abs(time - other) === 60 * 60 * 1000));
+    },
+  },
+  {
+    key: "the_comeback",
+    title: "The Comeback",
+    description: "Log a 5-star beer immediately after a 1-star beer.",
+    icon: "🔄",
+    hidden: true,
+    check: (logs) => {
+      const sorted = [...logs].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      return sorted.some((log, index) => index > 0 && log.rating === 5 && sorted[index - 1].rating === 1);
+    },
+  },
+  ...[20, 50, 100, 150, 200].map((threshold) => ({
+    key: `lucky_number_${threshold}`,
+    title: `Lucky Number ${threshold}`,
+    description: `Log the beer that brings the group to exactly ${threshold} beers.`,
+    icon: "🎰",
+    hidden: true,
+    check: (logs: BeerLog[], _profile: Profile, context?: AchievementContext) =>
+      (context?.allLogs.length ?? logs.length) === threshold,
+  })),
+  {
+    key: "the_outlier",
+    title: "The Outlier",
+    description: "Be the only player to log a particular beer.",
+    icon: "🛰️",
+    hidden: true,
+    check: (_logs, _profile, context) => {
+      if (!context) return false;
+      const ownersByBeer = new Map<string, Set<string>>();
+      context.allLogs.forEach((log) => {
+        const owners = ownersByBeer.get(normalized(log.beer_name)) ?? new Set<string>();
+        owners.add(log.user_id);
+        ownersByBeer.set(normalized(log.beer_name), owners);
+      });
+      return context.allLogs.some(
+        (log) => log.user_id === context.currentUserId && (ownersByBeer.get(normalized(log.beer_name))?.size ?? 0) === 1
+      );
+    },
+  },
+  {
+    key: "leaderboard_ghost",
+    title: "Leaderboard Ghost",
+    description: "Hold first place, then disappear from the top spot within ten minutes on the final day.",
+    icon: "👻",
+    hidden: true,
+    check: (_logs, _profile, context) => Boolean(context?.isTripFinalDay && context.leaderboardGhost),
+  },
+  {
+    key: "the_underdog",
+    title: "The Underdog",
+    description: "Move from last place into the top three on the final day.",
+    icon: "🐕",
+    hidden: true,
+    check: (_logs, _profile, context) => Boolean(context?.isTripFinalDay && context.underdog),
+  },
+  {
+    key: "plot_armor",
+    title: "Plot Armor",
+    description: "Unlock two other achievements from a single beer log.",
+    icon: "🛡️",
+    hidden: true,
+    check: (_logs, _profile, context) => Boolean(context?.plotArmor),
   },
 ];
 
