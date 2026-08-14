@@ -1,4 +1,4 @@
-const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
 const MAX_DIMENSION = 1920;
 
 export async function compressIfNeeded(file: File): Promise<File> {
