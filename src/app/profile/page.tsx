@@ -174,6 +174,7 @@ export default function ProfilePage() {
       } else {
         const validKeys = new Set(
           ACHIEVEMENTS.filter((achievement) =>
+            achievement.hidden ||
             achievement.check(remainingLogs, profile ?? ({} as Profile))
           ).map((achievement) => achievement.key)
         );
