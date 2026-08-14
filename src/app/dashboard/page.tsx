@@ -582,6 +582,12 @@ export default function DashboardPage() {
           >
             View the shared photo wall
           </Link>
+          <Link
+            href="/timeline"
+            className="ml-4 mt-4 inline-flex items-center gap-2 text-sm font-medium text-amber-200 underline hover:text-white"
+          >
+            Explore the trip timeline
+          </Link>
         </CardContent>
       </Card>
 

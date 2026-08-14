@@ -13,6 +13,7 @@ import {
   LogOut,
   Map,
   Camera,
+  Clock3,
 } from "lucide-react";
 
 const navItems = [
@@ -21,6 +22,7 @@ const navItems = [
   { href: "/leaderboard", label: "Leaderboard", mobileLabel: "Board", icon: Trophy },
   { href: "/map", label: "Beer Map", mobileLabel: "Map", icon: Map },
   { href: "/photos", label: "Photo Wall", mobileLabel: "Photos", icon: Camera, desktopOnly: true },
+  { href: "/timeline", label: "Trip Timeline", mobileLabel: "Timeline", icon: Clock3, desktopOnly: true },
   { href: "/achievements", label: "Achievements", mobileLabel: "Badges", icon: Medal },
   { href: "/profile", label: "Profile", mobileLabel: "Me", icon: User },
 ];
