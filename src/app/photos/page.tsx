@@ -2,7 +2,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useMemo, useState } from "react";
-import { Camera, ChevronLeft, ChevronRight, Download, Image as ImageIcon } from "lucide-react";
+import { Camera, ChevronLeft, ChevronRight, Download, Image as ImageIcon, Trophy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -20,6 +20,30 @@ type PhotoLog = {
   profiles?: { player_name: string } | { player_name: string }[] | null;
 };
 
+type ReactionKey = "cheers" | "love" | "must_try";
+type ReactionCounts = Record<ReactionKey, number>;
+type PhotoReaction = {
+  beer_log_id: string;
+  user_id: string;
+  reaction: ReactionKey;
+};
+
+const REACTIONS: { key: ReactionKey; label: string; icon: string }[] = [
+  { key: "cheers", label: "Cheers", icon: "🍺" },
+  { key: "love", label: "Love it", icon: "❤️" },
+  { key: "must_try", label: "Must try", icon: "🔥" },
+];
+
+const emptyReactionCounts = (): ReactionCounts => ({
+  cheers: 0,
+  love: 0,
+  must_try: 0,
+});
+
+function localDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 function playerName(log: PhotoLog) {
   return Array.isArray(log.profiles)
     ? log.profiles[0]?.player_name ?? "Unknown player"
@@ -28,6 +52,8 @@ function playerName(log: PhotoLog) {
 
 export default function PhotosPage() {
   const [photos, setPhotos] = useState<PhotoLog[]>([]);
+  const [reactionCounts, setReactionCounts] = useState<Record<string, ReactionCounts>>({});
+  const [myReactions, setMyReactions] = useState<Record<string, ReactionKey>>({});
   const [playerFilter, setPlayerFilter] = useState("");
   const [cityFilter, setCityFilter] = useState("");
   const [ratingFilter, setRatingFilter] = useState("0");
@@ -39,13 +65,40 @@ export default function PhotosPage() {
   useEffect(() => {
     async function load() {
       const supabase = createClient();
-      const { data, error: queryError } = await supabase
-        .from("beer_logs")
-        .select("id, beer_name, brewery, rating, city, bar_name, photo_url, created_at, profiles(player_name)")
-        .not("photo_url", "is", null)
-        .order("created_at", { ascending: false });
+      const [{ data: userData }, { data, error: queryError }] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase
+          .from("beer_logs")
+          .select("id, beer_name, brewery, rating, city, bar_name, photo_url, created_at, profiles(player_name)")
+          .not("photo_url", "is", null)
+          .order("created_at", { ascending: false }),
+      ]);
       if (queryError) setError(queryError.message);
       setPhotos((data as PhotoLog[]) ?? []);
+
+      const photoIds = (data ?? []).map((photo) => photo.id);
+      if (photoIds.length > 0) {
+        const { data: reactions, error: reactionError } = await supabase
+          .from("photo_reactions")
+          .select("beer_log_id, user_id, reaction")
+          .in("beer_log_id", photoIds);
+        if (reactionError) {
+          setError(reactionError.message);
+        } else {
+          const counts: Record<string, ReactionCounts> = {};
+          const mine: Record<string, ReactionKey> = {};
+          (reactions as PhotoReaction[]).forEach((reaction) => {
+            const current = counts[reaction.beer_log_id] ?? emptyReactionCounts();
+            current[reaction.reaction] += 1;
+            counts[reaction.beer_log_id] = current;
+            if (reaction.user_id === userData.user?.id) {
+              mine[reaction.beer_log_id] = reaction.reaction;
+            }
+          });
+          setReactionCounts(counts);
+          setMyReactions(mine);
+        }
+      }
       setLoading(false);
     }
     load();
@@ -70,6 +123,31 @@ export default function PhotosPage() {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
   }, [photos, playerFilter, cityFilter, ratingFilter, sortBy]);
+
+  const photoOfTheDay = useMemo(() => {
+    const today = localDateKey(new Date());
+    return photos
+      .filter((photo) => localDateKey(new Date(photo.created_at)) === today)
+      .sort((a, b) => {
+        const aCounts = reactionCounts[a.id] ?? emptyReactionCounts();
+        const bCounts = reactionCounts[b.id] ?? emptyReactionCounts();
+        const reactionDifference =
+          Object.values(bCounts).reduce((sum, count) => sum + count, 0) -
+          Object.values(aCounts).reduce((sum, count) => sum + count, 0);
+        if (reactionDifference !== 0) return reactionDifference;
+        if (b.rating !== a.rating) return b.rating - a.rating;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      })[0] ?? null;
+  }, [photos, reactionCounts]);
+  const photoOfTheDayReactions = photoOfTheDay
+    ? Object.values(reactionCounts[photoOfTheDay.id] ?? emptyReactionCounts()).reduce(
+        (sum, count) => sum + count,
+        0
+      )
+    : 0;
+  const photoOfTheDayIndex = photoOfTheDay
+    ? filteredPhotos.findIndex((photo) => photo.id === photoOfTheDay.id)
+    : -1;
 
   const selectedPhoto = selectedPhotoIndex !== null ? filteredPhotos[selectedPhotoIndex] ?? null : null;
 
@@ -109,6 +187,49 @@ export default function PhotosPage() {
     }
   }
 
+  async function toggleReaction(photoId: string, reaction: ReactionKey) {
+    const supabase = createClient();
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) {
+      setError("Sign in to react to photos.");
+      return;
+    }
+
+    const previousReaction = myReactions[photoId];
+    const nextReaction = previousReaction === reaction ? undefined : reaction;
+    const previousCounts = reactionCounts[photoId] ?? emptyReactionCounts();
+    const nextCounts = { ...previousCounts };
+    if (previousReaction) nextCounts[previousReaction] = Math.max(0, nextCounts[previousReaction] - 1);
+    if (nextReaction) nextCounts[nextReaction] += 1;
+
+    setReactionCounts((current) => ({ ...current, [photoId]: nextCounts }));
+    setMyReactions((current) => {
+      const updated = { ...current };
+      if (nextReaction) updated[photoId] = nextReaction;
+      else delete updated[photoId];
+      return updated;
+    });
+
+    const { error: deleteError } = await supabase
+      .from("photo_reactions")
+      .delete()
+      .eq("beer_log_id", photoId)
+      .eq("user_id", userId);
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+    if (nextReaction) {
+      const { error: insertError } = await supabase.from("photo_reactions").insert({
+        beer_log_id: photoId,
+        user_id: userId,
+        reaction: nextReaction,
+      });
+      if (insertError) setError(insertError.message);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <header className="flex items-center gap-3">
@@ -143,6 +264,46 @@ export default function PhotosPage() {
 
       {error && <p className="rounded-lg border border-red-800 bg-red-950/40 p-3 text-sm text-red-300">{error}</p>}
       {loading && <p className="py-10 text-center text-amber-400">Loading photos...</p>}
+      {!loading && photoOfTheDay && (
+        <Card className="overflow-hidden border-amber-500 bg-amber-800/60">
+          <div className="grid gap-0 sm:grid-cols-[minmax(0,220px)_1fr]">
+            <button
+              type="button"
+              onClick={() => photoOfTheDayIndex >= 0 && openPhoto(photoOfTheDayIndex)}
+              disabled={photoOfTheDayIndex < 0}
+              className="group relative block aspect-square w-full overflow-hidden text-left disabled:cursor-default"
+              aria-label={`Open photo of the day: ${photoOfTheDay.beer_name}`}
+            >
+              <img
+                src={photoOfTheDay.photo_url}
+                alt={`${photoOfTheDay.beer_name} photo of the day`}
+                className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+              />
+              <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-amber-950/90 px-2.5 py-1 text-xs font-semibold text-amber-200">
+                <Trophy size={13} />
+                Photo of the day
+              </span>
+            </button>
+            <CardContent className="flex flex-col justify-center p-4 sm:p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-300">Today&apos;s winner</p>
+              <h2 className="mt-1 truncate text-xl font-bold text-amber-100">{photoOfTheDay.beer_name}</h2>
+              <p className="mt-1 text-sm text-amber-300">
+                {playerName(photoOfTheDay)} · {photoOfTheDay.bar_name ?? photoOfTheDay.city ?? "Unknown place"}
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-amber-200">
+                <span>{"★".repeat(photoOfTheDay.rating)}</span>
+                <span className="text-amber-500">·</span>
+                <span>{photoOfTheDayReactions} {photoOfTheDayReactions === 1 ? "reaction" : "reactions"}</span>
+              </div>
+              <p className="mt-3 text-xs text-amber-400">
+                {photoOfTheDayReactions > 0
+                  ? "The crew has chosen today's favorite shot."
+                  : "Be the first to react and set today&apos;s bar."}
+              </p>
+            </CardContent>
+          </div>
+        </Card>
+      )}
       {!loading && filteredPhotos.length === 0 && (
         <div className="rounded-xl border border-amber-700 bg-amber-900/50 p-10 text-center text-amber-400">
           <ImageIcon className="mx-auto mb-3" size={32} />
@@ -178,6 +339,29 @@ export default function PhotosPage() {
               </div>
               <p className="mt-1 text-xs text-amber-300">{"★".repeat(photo.rating)}</p>
               <p className="truncate text-xs text-amber-500">{photo.bar_name ?? photo.city ?? "Unknown place"}</p>
+              <div className="mt-3 flex flex-wrap gap-1.5 border-t border-amber-800/70 pt-2">
+                {REACTIONS.map((reaction) => {
+                  const counts = reactionCounts[photo.id] ?? emptyReactionCounts();
+                  const active = myReactions[photo.id] === reaction.key;
+                  return (
+                    <button
+                      key={reaction.key}
+                      type="button"
+                      onClick={() => void toggleReaction(photo.id, reaction.key)}
+                      aria-pressed={active}
+                      aria-label={`${reaction.label}: ${counts[reaction.key]}`}
+                      className={`inline-flex min-h-8 items-center gap-1 rounded-full border px-2 py-1 text-xs transition-colors ${
+                        active
+                          ? "border-amber-300 bg-amber-700 text-amber-50"
+                          : "border-amber-800 bg-amber-950/50 text-amber-400 hover:border-amber-600 hover:text-amber-200"
+                      }`}
+                    >
+                      <span aria-hidden="true">{reaction.icon}</span>
+                      <span>{counts[reaction.key]}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </CardContent>
           </Card>
         ))}
@@ -229,6 +413,28 @@ export default function PhotosPage() {
                   <Download size={14} />
                   Download
                 </button>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2 border-t border-amber-800/70 pt-3">
+                {REACTIONS.map((reaction) => {
+                  const counts = reactionCounts[selectedPhoto.id] ?? emptyReactionCounts();
+                  const active = myReactions[selectedPhoto.id] === reaction.key;
+                  return (
+                    <button
+                      key={reaction.key}
+                      type="button"
+                      onClick={() => void toggleReaction(selectedPhoto.id, reaction.key)}
+                      aria-pressed={active}
+                      className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                        active
+                          ? "border-amber-300 bg-amber-700 text-amber-50"
+                          : "border-amber-800 bg-amber-950/50 text-amber-400 hover:border-amber-600 hover:text-amber-200"
+                      }`}
+                    >
+                      <span aria-hidden="true">{reaction.icon}</span>
+                      {reaction.label} {counts[reaction.key]}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </DialogContent>
