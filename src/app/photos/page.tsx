@@ -2,7 +2,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useMemo, useState } from "react";
-import { Camera, ChevronLeft, ChevronRight, Download, Image as ImageIcon, Trophy } from "lucide-react";
+import { Camera, ChevronLeft, ChevronRight, Download, Image as ImageIcon, Share2, Trophy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { processBeerLog } from "@/lib/process-beer-log";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +18,15 @@ type PhotoLog = {
   bar_name: string | null;
   photo_url: string;
   created_at: string;
+  profiles?: { player_name: string } | { player_name: string }[] | null;
+};
+
+type GroupLog = {
+  id: string;
+  user_id: string;
+  rating: number;
+  city: string | null;
+  bar_name: string | null;
   profiles?: { player_name: string } | { player_name: string }[] | null;
 };
 
@@ -53,6 +62,7 @@ function playerName(log: PhotoLog) {
 
 export default function PhotosPage() {
   const [photos, setPhotos] = useState<PhotoLog[]>([]);
+  const [groupLogs, setGroupLogs] = useState<GroupLog[]>([]);
   const [reactionCounts, setReactionCounts] = useState<Record<string, ReactionCounts>>({});
   const [myReactions, setMyReactions] = useState<Record<string, ReactionKey>>({});
   const [playerFilter, setPlayerFilter] = useState("");
@@ -67,16 +77,22 @@ export default function PhotosPage() {
   useEffect(() => {
     async function load() {
       const supabase = createClient();
-      const [{ data: userData }, { data, error: queryError }] = await Promise.all([
+      const [{ data: userData }, { data, error: queryError }, { data: allLogs, error: groupError }] = await Promise.all([
         supabase.auth.getUser(),
         supabase
           .from("beer_logs")
           .select("id, beer_name, brewery, rating, city, bar_name, photo_url, created_at, profiles(player_name)")
           .not("photo_url", "is", null)
           .order("created_at", { ascending: false }),
+          supabase
+            .from("beer_logs")
+            .select("id, user_id, rating, city, bar_name, profiles(player_name)")
+            .order("created_at", { ascending: false }),
       ]);
       if (queryError) setError(queryError.message);
+          if (groupError) setError(groupError.message);
       setPhotos((data as PhotoLog[]) ?? []);
+          setGroupLogs((allLogs as GroupLog[]) ?? []);
 
       const photoIds = (data ?? []).map((photo) => photo.id);
       if (photoIds.length > 0) {
@@ -150,6 +166,22 @@ export default function PhotosPage() {
   const photoOfTheDayIndex = photoOfTheDay
     ? filteredPhotos.findIndex((photo) => photo.id === photoOfTheDay.id)
     : -1;
+  const groupStats = useMemo(() => {
+    const cityCounts = new Map<string, number>();
+    groupLogs.forEach((log) => {
+      if (log.city) cityCounts.set(log.city, (cityCounts.get(log.city) ?? 0) + 1);
+    });
+    const topCity = [...cityCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "No city yet";
+    return {
+      beers: groupLogs.length,
+      average: groupLogs.length
+        ? (groupLogs.reduce((sum, log) => sum + log.rating, 0) / groupLogs.length).toFixed(1)
+        : "—",
+      pubs: new Set(groupLogs.map((log) => log.bar_name?.trim().toLowerCase()).filter(Boolean)).size,
+      players: new Set(groupLogs.map((log) => log.user_id)).size,
+      topCity,
+    };
+  }, [groupLogs]);
 
   const selectedPhoto = selectedPhotoIndex !== null ? filteredPhotos[selectedPhotoIndex] ?? null : null;
 
@@ -186,6 +218,127 @@ export default function PhotosPage() {
       document.body.appendChild(fallback);
       fallback.click();
       document.body.removeChild(fallback);
+    }
+  }
+
+  function downloadBlob(blob: Blob, filename: string) {
+    const blobUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = blobUrl;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(blobUrl);
+  }
+
+  async function exportPhotoOfTheDay() {
+    if (!photoOfTheDay) return;
+
+    setError("");
+    const canvas = document.createElement("canvas");
+    canvas.width = 1600;
+    canvas.height = 1000;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      setError("Could not create the export image.");
+      return;
+    }
+
+    const background = context.createLinearGradient(0, 0, canvas.width, canvas.height);
+    background.addColorStop(0, "#451a03");
+    background.addColorStop(1, "#78350f");
+    context.fillStyle = background;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    const imageX = 60;
+    const imageY = 60;
+    const imageWidth = 720;
+    const imageHeight = 880;
+    try {
+      const image = new Image();
+      image.crossOrigin = "anonymous";
+      image.src = photoOfTheDay.photo_url;
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error("Photo could not be loaded"));
+      });
+      const scale = Math.max(imageWidth / image.width, imageHeight / image.height);
+      const sourceWidth = imageWidth / scale;
+      const sourceHeight = imageHeight / scale;
+      context.drawImage(
+        image,
+        (image.width - sourceWidth) / 2,
+        (image.height - sourceHeight) / 2,
+        sourceWidth,
+        sourceHeight,
+        imageX,
+        imageY,
+        imageWidth,
+        imageHeight
+      );
+    } catch {
+      context.fillStyle = "#92400e";
+      context.fillRect(imageX, imageY, imageWidth, imageHeight);
+      context.fillStyle = "#fde68a";
+      context.font = "600 32px Geist, sans-serif";
+      context.fillText("Photo unavailable", imageX + 210, imageY + imageHeight / 2);
+    }
+
+    context.fillStyle = "rgba(28, 14, 4, 0.78)";
+    context.fillRect(840, 60, 700, 880);
+    context.fillStyle = "#fcd34d";
+    context.font = "700 34px Geist, sans-serif";
+    context.fillText("PHOTO OF THE DAY", 900, 135);
+    context.fillStyle = "#fffbeb";
+    context.font = "700 58px Geist, sans-serif";
+    context.fillText(photoOfTheDay.beer_name.slice(0, 22), 900, 220);
+    context.fillStyle = "#fbbf24";
+    context.font = "400 28px Geist, sans-serif";
+    context.fillText(`${playerName(photoOfTheDay)} · ${photoOfTheDay.city ?? "Unknown city"}`, 900, 275);
+    context.fillText(photoOfTheDay.bar_name ?? "Unknown place", 900, 320);
+
+    context.fillStyle = "#fef3c7";
+    context.font = "700 34px Geist, sans-serif";
+    context.fillText(`${"★".repeat(photoOfTheDay.rating)}  ·  ${photoOfTheDayReactions} reactions`, 900, 400);
+    context.fillStyle = "#fcd34d";
+    context.font = "700 28px Geist, sans-serif";
+    context.fillText("GROUP RECAP", 900, 510);
+    context.fillStyle = "#fffbeb";
+    context.font = "500 30px Geist, sans-serif";
+    const statLines = [
+      `${groupStats.beers} beers logged`,
+      `${groupStats.average} average rating`,
+      `${groupStats.pubs} pubs visited`,
+      `${groupStats.players} players playing`,
+      `Top city: ${groupStats.topCity}`,
+    ];
+    statLines.forEach((line, index) => context.fillText(line, 900, 570 + index * 52));
+    context.fillStyle = "#f59e0b";
+    context.font = "400 22px Geist, sans-serif";
+    context.fillText("Hop Tracker · Czech Republic 2026", 900, 885);
+
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!blob) {
+      setError("Could not create the export image.");
+      return;
+    }
+
+    const filename = `hop-tracker-photo-of-the-day-${localDateKey(new Date())}.png`;
+    const file = new File([blob], filename, { type: "image/png" });
+    try {
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: "Hop Tracker Photo of the Day",
+          text: `${photoOfTheDay.beer_name} · Photo of the Day`,
+        });
+      } else {
+        downloadBlob(blob, filename);
+      }
+    } catch (shareError) {
+      if (shareError instanceof DOMException && shareError.name === "AbortError") return;
+      downloadBlob(blob, filename);
     }
   }
 
@@ -316,6 +469,14 @@ export default function PhotosPage() {
                   ? "The crew has chosen today's favorite shot."
                   : "Be the first to react and set today&apos;s bar."}
               </p>
+              <button
+                type="button"
+                onClick={() => void exportPhotoOfTheDay()}
+                className="mt-4 inline-flex min-h-10 w-fit items-center gap-2 rounded-md border border-amber-500 bg-amber-700 px-3 py-2 text-sm font-semibold text-amber-50 transition-colors hover:bg-amber-600"
+              >
+                <Share2 size={15} />
+                Export for sharing
+              </button>
             </CardContent>
           </div>
         </Card>
