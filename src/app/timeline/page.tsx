@@ -73,14 +73,14 @@ export default function TimelinePage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-4 sm:space-y-5">
+    <div className="space-y-5">
       <header className="flex items-center gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-700/70">
           <Clock3 size={21} className="text-amber-200" />
         </div>
         <div className="min-w-0">
-          <h1 className="text-xl font-bold text-amber-100 sm:text-2xl">Trip timeline</h1>
-          <p className="text-xs text-amber-400 sm:text-sm">Replay the crew&apos;s beers, photos, and city stops</p>
+          <h1 className="text-2xl font-bold text-amber-100">Trip timeline</h1>
+          <p className="text-sm text-amber-400">Replay the crew&apos;s beers, photos, and city stops</p>
         </div>
       </header>
 
@@ -101,7 +101,7 @@ export default function TimelinePage() {
                   onClick={() => moveTimelineDay(-1)}
                   disabled={safeTimelineDay === 0}
                   aria-label="Previous timeline day"
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-amber-700 text-amber-200 transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-35"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-amber-700 bg-amber-900/60 text-amber-200 transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-35"
                 >
                   <ChevronLeft size={20} />
                 </button>
@@ -118,7 +118,7 @@ export default function TimelinePage() {
                   onClick={() => moveTimelineDay(1)}
                   disabled={safeTimelineDay === timelineDayCount - 1}
                   aria-label="Next timeline day"
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-amber-700 text-amber-200 transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-35"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-amber-700 bg-amber-900/60 text-amber-200 transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-35"
                 >
                   <ChevronRight size={20} />
                 </button>
@@ -148,7 +148,7 @@ export default function TimelinePage() {
                 </div>
               ) : (
                 selectedTimelineLogs.map((log) => (
-                  <div key={log.id} className="flex min-w-0 items-start gap-2 rounded-lg bg-amber-950/40 p-3 sm:items-center sm:gap-3">
+                  <div key={log.id} className="flex min-w-0 items-start gap-2 rounded-lg border border-amber-800/70 bg-amber-950/40 p-3 sm:items-center sm:gap-3">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-amber-700 text-sm">
                       {log.profiles?.avatar_url ? (
                         <img src={log.profiles.avatar_url} alt="" className="h-full w-full object-cover" />
