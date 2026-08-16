@@ -331,15 +331,42 @@ export default function LogBeerPage() {
     }
 
     let pubToSave: Omit<Pub, "id"> | null = pendingPub;
-    let mapWarning = "";
     if (!pubId && !pendingPub && barName.trim() && city.trim()) {
       try {
         pubToSave = await resolvePubForSave();
       } catch (mapFailure) {
-        mapWarning = mapFailure instanceof Error
+        setError(mapFailure instanceof Error
           ? mapFailure.message
-          : "The address could not be located for the map.";
+          : "The address could not be located for the map.");
+        setLoading(false);
+        return;
       }
+    }
+
+    let savedPubId = pubId || null;
+    if (pubToSave) {
+      const existingPub = pubs.find(
+        (pub) =>
+          pub.name.trim().toLowerCase() === pubToSave?.name.trim().toLowerCase() &&
+          pub.city.trim().toLowerCase() === pubToSave?.city.trim().toLowerCase()
+      );
+      const { data: savedPub, error: pubError } = existingPub
+        ? { data: existingPub, error: null }
+        : await supabase
+            .from("pubs")
+            .insert(pubToSave)
+            .select("*")
+            .single();
+      if (pubError || !savedPub) {
+        setError(
+          `The beer could not be saved because its map location failed: ${
+            pubError?.message ?? "unknown error"
+          }`
+        );
+        setLoading(false);
+        return;
+      }
+      savedPubId = savedPub.id;
     }
 
     let photoUrl: string | null = null;
@@ -368,7 +395,7 @@ export default function LogBeerPage() {
       rating,
       city: city || null,
       bar_name: barName || null,
-      pub_id: pubId || null,
+      pub_id: savedPubId,
       notes: notes || null,
       photo_url: photoUrl,
       })
@@ -379,37 +406,6 @@ export default function LogBeerPage() {
       setError(insertErr.message);
       setLoading(false);
       return;
-    }
-
-    if (pubToSave) {
-      const existingPub = pubs.find(
-        (pub) =>
-          pub.name.trim().toLowerCase() === pubToSave?.name.trim().toLowerCase() &&
-          pub.city.trim().toLowerCase() === pubToSave?.city.trim().toLowerCase()
-      );
-      const { data: savedPub, error: pubError } = existingPub
-        ? { data: existingPub, error: null }
-        : await supabase
-            .from("pubs")
-            .insert(pubToSave)
-            .select("*")
-            .single();
-      if (pubError || !savedPub) {
-        setError(
-          `Beer saved, but the map location could not be added: ${
-            pubError?.message ?? "unknown error"
-          }`
-        );
-      } else {
-        await supabase
-          .from("beer_logs")
-          .update({ pub_id: savedPub.id })
-          .eq("id", savedBeer.id);
-      }
-    }
-
-    if (mapWarning) {
-      setError(`Beer saved, but the address was not added to the map: ${mapWarning}`);
     }
 
     const newAchievementNames = await processBeerLog(supabase, user.id);
