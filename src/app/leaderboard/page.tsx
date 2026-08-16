@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Trophy } from "lucide-react";
 import { getLocalDate, getTodayChallenge, isToday } from "@/lib/challenges";
+import { estimatePromille } from "@/lib/promille";
 
 interface PlayerStats {
   profile: Profile;
@@ -18,6 +19,7 @@ interface PlayerStats {
   achievements: number;
   challengePoints: number;
   challengesCompleted: number;
+  estimatedPromille: number;
 }
 
 const categories = [
@@ -26,9 +28,68 @@ const categories = [
   { key: "unique", label: "Variety", icon: "🌈", valueKey: "unique", unit: "unique beers" },
   { key: "achievements", label: "Achievements", icon: "🏆", valueKey: "achievements", unit: "achievements" },
   { key: "challengePoints", label: "Challenges", icon: "🎯", valueKey: "challengePoints", unit: "points" },
+  { key: "estimatedPromille", label: "Estimated Level", icon: "⚠️", valueKey: "estimatedPromille", unit: "estimated ‰" },
 ] as const;
 
 type CategoryKey = (typeof categories)[number]["key"];
+
+const medals = ["🥇", "🥈", "🥉"];
+
+function RankList({
+  sorted,
+  valueKey,
+  unit,
+}: {
+  sorted: PlayerStats[];
+  valueKey: keyof PlayerStats;
+  unit: string;
+}) {
+  return (
+    <div className="w-full min-w-0 space-y-3">
+      {sorted.map((s, i) => (
+        <Card
+          key={s.profile.id}
+          className={`w-full min-w-0 overflow-hidden border ${
+            i === 0
+              ? "border-amber-400 bg-amber-800/60"
+              : "border-amber-700 bg-amber-900/40"
+          }`}
+        >
+          <CardContent className="min-w-0 p-3 sm:p-4 flex items-start sm:items-center gap-2 sm:gap-4">
+            <span className="text-xl sm:text-2xl w-7 sm:w-8 text-center shrink-0 pt-1 sm:pt-0">
+              {medals[i] ?? `#${i + 1}`}
+            </span>
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-amber-700 flex items-center justify-center overflow-hidden shrink-0">
+              {s.profile.avatar_url ? (
+                <img src={s.profile.avatar_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-lg">🍺</span>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-amber-100 truncate">{s.profile.player_name}</p>
+              <div className="flex gap-1.5 mt-1 flex-wrap">
+                <Badge variant="outline" className="text-[10px] sm:text-xs border-amber-700 text-amber-400 px-1.5">🍺 {s.total} beers</Badge>
+                <Badge variant="outline" className="text-[10px] sm:text-xs border-amber-700 text-amber-400 px-1.5">⭐ {s.avg.toFixed(1)} avg</Badge>
+                <Badge variant="outline" className="text-[10px] sm:text-xs border-amber-700 text-amber-400 px-1.5">🏆 {s.achievements}</Badge>
+                <Badge variant="outline" className="text-[10px] sm:text-xs border-amber-700 text-amber-400 px-1.5">🎯 {s.challengePoints} pts</Badge>
+              </div>
+            </div>
+            <div className="max-w-[4.5rem] text-right shrink-0 pt-1 sm:pt-0">
+              <p className="text-xl sm:text-2xl font-bold text-amber-300">
+                {typeof s[valueKey] === "number"
+                  ? (s[valueKey] as number).toFixed(valueKey === "avg" || valueKey === "estimatedPromille" ? 2 : 0)
+                  : String(s[valueKey])}
+              </p>
+              <p className="text-xs text-amber-500">{unit}</p>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+      {sorted.length === 0 && <p className="text-amber-500 text-sm text-center py-8">No data yet — log some beers!</p>}
+    </div>
+  );
+}
 
 export default function LeaderboardPage() {
   const [stats, setStats] = useState<PlayerStats[]>([]);
@@ -105,6 +166,10 @@ export default function LeaderboardPage() {
           ) + currentChallengePoints,
           challengesCompleted: myChallenges.length +
             (currentChallengePoints > 0 ? 1 : 0),
+          estimatedPromille: estimatePromille(myLogs as BeerLog[], {
+            weightKg: p.weight_kg,
+            sex: p.sex,
+          }),
         };
       });
 
@@ -121,93 +186,7 @@ export default function LeaderboardPage() {
       </div>
     );
 
-  const medals = ["🥇", "🥈", "🥉"];
   const selectedCategory = categories.find((item) => item.key === category)!;
-
-  function RankList({
-    sorted,
-    valueKey,
-    unit,
-  }: {
-    sorted: PlayerStats[];
-    valueKey: keyof PlayerStats;
-    unit: string;
-  }) {
-    return (
-      <div className="w-full min-w-0 space-y-3">
-        {sorted.map((s, i) => (
-          <Card
-            key={s.profile.id}
-            className={`w-full min-w-0 overflow-hidden border ${
-              i === 0
-                ? "border-amber-400 bg-amber-800/60"
-                : "border-amber-700 bg-amber-900/40"
-            }`}
-          >
-            <CardContent className="min-w-0 p-3 sm:p-4 flex items-start sm:items-center gap-2 sm:gap-4">
-              <span className="text-xl sm:text-2xl w-7 sm:w-8 text-center shrink-0 pt-1 sm:pt-0">
-                {medals[i] ?? `#${i + 1}`}
-              </span>
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-amber-700 flex items-center justify-center overflow-hidden shrink-0">
-                {s.profile.avatar_url ? (
-                  <img
-                    src={s.profile.avatar_url}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span className="text-lg">🍺</span>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-amber-100 truncate">
-                  {s.profile.player_name}
-                </p>
-                <div className="flex gap-1.5 mt-1 flex-wrap">
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] sm:text-xs border-amber-700 text-amber-400 px-1.5"
-                  >
-                    🍺 {s.total} beers
-                  </Badge>
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] sm:text-xs border-amber-700 text-amber-400 px-1.5"
-                  >
-                    ⭐ {s.avg.toFixed(1)} avg
-                  </Badge>
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] sm:text-xs border-amber-700 text-amber-400 px-1.5"
-                  >
-                    🏆 {s.achievements}
-                  </Badge>
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] sm:text-xs border-amber-700 text-amber-400 px-1.5"
-                  >
-                    🎯 {s.challengePoints} pts
-                  </Badge>
-                </div>
-              </div>
-              <div className="max-w-[4.5rem] text-right shrink-0 pt-1 sm:pt-0">
-                <p className="text-xl sm:text-2xl font-bold text-amber-300">
-                {typeof s[valueKey] === "number"
-                  ? (s[valueKey] as number).toFixed(valueKey === "avg" ? 1 : 0)
-                  : String(s[valueKey])}
-                </p>
-                <p className="text-xs text-amber-500">{unit}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-        {sorted.length === 0 && (
-          <p className="text-amber-500 text-sm text-center py-8">
-            No data yet — log some beers!
-          </p>
-        )}
-      </div>
-    );
-  }
 
   return (
     <div className="w-full min-w-0 space-y-5">
@@ -225,7 +204,7 @@ export default function LeaderboardPage() {
         <p className="px-1 pb-2 text-xs font-medium uppercase tracking-wide text-amber-500">
           Rank by
         </p>
-        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-6">
           {categories.map((item) => (
             <button
               key={item.key}
@@ -252,12 +231,17 @@ export default function LeaderboardPage() {
               {selectedCategory.icon} {selectedCategory.label}
             </h2>
             <p className="text-xs text-amber-500">{stats.length} players</p>
+            {category === "estimatedPromille" && (
+              <p className="mt-1 max-w-xl text-xs text-red-300">
+                Educational estimate only. Never use this ranking to decide whether anyone can drive.
+              </p>
+            )}
           </div>
           <span className="shrink-0 text-xs text-amber-500">{selectedCategory.unit}</span>
         </div>
         <RankList
           sorted={[...stats]
-            .filter((s) => category !== "avg" || s.total > 0)
+            .filter((s) => (category !== "avg" && category !== "estimatedPromille") || s.total > 0)
             .sort((a, b) => (b[category] as number) - (a[category] as number))}
           valueKey={selectedCategory.valueKey}
           unit={selectedCategory.unit}
