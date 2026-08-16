@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Trophy } from "lucide-react";
 import { getLocalDate, getTodayChallenge, isToday } from "@/lib/challenges";
-import { estimatePromille } from "@/lib/promille";
+import { estimatePeakPromille } from "@/lib/promille";
 
 interface PlayerStats {
   profile: Profile;
@@ -19,7 +19,7 @@ interface PlayerStats {
   achievements: number;
   challengePoints: number;
   challengesCompleted: number;
-  estimatedPromille: number;
+  peakPromille: number;
 }
 
 const categories = [
@@ -28,7 +28,7 @@ const categories = [
   { key: "unique", label: "Variety", icon: "🌈", valueKey: "unique", unit: "unique beers" },
   { key: "achievements", label: "Achievements", icon: "🏆", valueKey: "achievements", unit: "achievements" },
   { key: "challengePoints", label: "Challenges", icon: "🎯", valueKey: "challengePoints", unit: "points" },
-  { key: "estimatedPromille", label: "Estimated Level", icon: "⚠️", valueKey: "estimatedPromille", unit: "estimated ‰" },
+  { key: "peakPromille", label: "Highest Ever", icon: "⚠️", valueKey: "peakPromille", unit: "peak estimated ‰" },
 ] as const;
 
 type CategoryKey = (typeof categories)[number]["key"];
@@ -78,7 +78,7 @@ function RankList({
             <div className="max-w-[4.5rem] text-right shrink-0 pt-1 sm:pt-0">
               <p className="text-xl sm:text-2xl font-bold text-amber-300">
                 {typeof s[valueKey] === "number"
-                  ? (s[valueKey] as number).toFixed(valueKey === "avg" || valueKey === "estimatedPromille" ? 2 : 0)
+                  ? (s[valueKey] as number).toFixed(valueKey === "avg" || valueKey === "peakPromille" ? 2 : 0)
                   : String(s[valueKey])}
               </p>
               <p className="text-xs text-amber-500">{unit}</p>
@@ -166,7 +166,7 @@ export default function LeaderboardPage() {
           ) + currentChallengePoints,
           challengesCompleted: myChallenges.length +
             (currentChallengePoints > 0 ? 1 : 0),
-          estimatedPromille: estimatePromille(myLogs as BeerLog[], {
+          peakPromille: estimatePeakPromille(myLogs as BeerLog[], {
             weightKg: p.weight_kg,
             sex: p.sex,
           }),
@@ -231,7 +231,7 @@ export default function LeaderboardPage() {
               {selectedCategory.icon} {selectedCategory.label}
             </h2>
             <p className="text-xs text-amber-500">{stats.length} players</p>
-            {category === "estimatedPromille" && (
+            {category === "peakPromille" && (
               <p className="mt-1 max-w-xl text-xs text-red-300">
                 Educational estimate only. Never use this ranking to decide whether anyone can drive.
               </p>
@@ -241,7 +241,7 @@ export default function LeaderboardPage() {
         </div>
         <RankList
           sorted={[...stats]
-            .filter((s) => (category !== "avg" && category !== "estimatedPromille") || s.total > 0)
+            .filter((s) => (category !== "avg" && category !== "peakPromille") || s.total > 0)
             .sort((a, b) => (b[category] as number) - (a[category] as number))}
           valueKey={selectedCategory.valueKey}
           unit={selectedCategory.unit}

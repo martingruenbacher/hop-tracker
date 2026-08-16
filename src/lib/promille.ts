@@ -35,6 +35,24 @@ export function estimatePromille(
   );
 }
 
+export function estimatePeakPromille(
+  logs: BeerLog[],
+  settings: PromilleSettings = DEFAULT_SETTINGS
+) {
+  const sortedLogs = [...logs].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+  let peak = 0;
+  for (let index = 0; index < sortedLogs.length; index += 1) {
+    const timestamp = new Date(sortedLogs[index].created_at);
+    peak = Math.max(
+      peak,
+      estimatePromille(sortedLogs.slice(0, index + 1), settings, timestamp)
+    );
+  }
+  return peak;
+}
+
 export function getPromilleSettings(): PromilleSettings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
 
