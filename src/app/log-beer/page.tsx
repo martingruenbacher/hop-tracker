@@ -168,15 +168,18 @@ export default function LogBeerPage() {
     setSearchResults([]);
 
     try {
-      const locationHint = city ? `, ${city}` : "";
-      const query = encodeURIComponent(
-        `${barName.trim()}${locationHint}, Czech Republic`
+      const countryQueries = ["Czech Republic", "Austria"];
+      const responses = await Promise.all(
+        countryQueries.map(async (country) => {
+          const locationHint = city ? `, ${city}` : "";
+          const query = encodeURIComponent(`${barName.trim()}${locationHint}, ${country}`);
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=1&accept-language=en&q=${query}`
+          );
+          return response.ok ? ((await response.json()) as PubSearchResult[]) : [];
+        })
       );
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=1&q=${query}`
-      );
-      if (!response.ok) throw new Error("The map search is unavailable right now.");
-      const results = (await response.json()) as PubSearchResult[];
+      const results = responses.flat();
       setSearchResults(results);
       if (results.length === 0) {
         setSearchError("No matching places found. Try a shorter pub name.");
@@ -293,6 +296,7 @@ export default function LogBeerPage() {
 
     const queries = [
       `${barName.trim()}, ${city.trim()}, Czech Republic`,
+      `${barName.trim()}, ${city.trim()}, Austria`,
       `${barName.trim()}, ${city.trim()}`,
       barName.trim(),
     ];
@@ -600,7 +604,7 @@ export default function LogBeerPage() {
                   <span className="hidden sm:inline">{searchingPubs ? "Searching" : "Search map"}</span>
                 </Button>
               </div>
-              <p className="text-[11px] text-amber-600">City is optional for searching. Confirm the result and city before adding it.</p>
+              <p className="text-[11px] text-amber-600">Search covers the Czech Republic and Austria. Confirm the result and city before adding it.</p>
               {searchError && <p className="text-xs text-amber-300">{searchError}</p>}
               {searchResults.length > 0 && (
                 <div className="space-y-2 rounded-lg border border-amber-700 bg-amber-950/50 p-2">
