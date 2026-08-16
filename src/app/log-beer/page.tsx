@@ -33,6 +33,12 @@ interface PubSearchResult {
   lat: string;
   lon: string;
   name?: string;
+  address?: {
+    city?: string;
+    town?: string;
+    village?: string;
+    municipality?: string;
+  };
 }
 
 type Coordinates = {
@@ -44,7 +50,14 @@ function cityFromSearchResult(result: PubSearchResult): string {
   const match = TRIP_CITIES.find((tripCity) =>
     result.display_name.toLowerCase().includes(tripCity.toLowerCase())
   );
-  return match ?? "";
+  return (
+    match ??
+    result.address?.city ??
+    result.address?.town ??
+    result.address?.village ??
+    result.address?.municipality ??
+    ""
+  );
 }
 
 export default function LogBeerPage() {
@@ -174,12 +187,16 @@ export default function LogBeerPage() {
           const locationHint = city ? `, ${city}` : "";
           const query = encodeURIComponent(`${barName.trim()}${locationHint}, ${country}`);
           const response = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=1&accept-language=en&q=${query}`
+            `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=10&addressdetails=1&namedetails=1&accept-language=en&countrycodes=cz,at&q=${query}`
           );
           return response.ok ? ((await response.json()) as PubSearchResult[]) : [];
         })
       );
-      const results = responses.flat();
+      const results = responses
+        .flat()
+        .filter((result, index, all) =>
+          all.findIndex((candidate) => candidate.lat === result.lat && candidate.lon === result.lon) === index
+        );
       setSearchResults(results);
       if (results.length === 0) {
         setSearchError("No matching places found. Try a shorter pub name.");
@@ -262,10 +279,10 @@ export default function LogBeerPage() {
 
   async function choosePub(result: PubSearchResult) {
     const name = result.name?.trim() || barName.trim();
-    const resultCity = city || cityFromSearchResult(result);
+    const resultCity = city.trim() || cityFromSearchResult(result);
     if (!resultCity) {
       setSearchError(
-        "Choose the trip city for this result before adding it to the map."
+        "The result has no city. Enter its city before adding it to the map."
       );
       return;
     }
