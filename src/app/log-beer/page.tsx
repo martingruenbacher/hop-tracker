@@ -35,6 +35,11 @@ interface PubSearchResult {
   name?: string;
 }
 
+type Coordinates = {
+  latitude: number;
+  longitude: number;
+};
+
 function cityFromSearchResult(result: PubSearchResult): string {
   const match = TRIP_CITIES.find((tripCity) =>
     result.display_name.toLowerCase().includes(tripCity.toLowerCase())
@@ -52,6 +57,7 @@ export default function LogBeerPage() {
   const [hoverRating, setHoverRating] = useState(0);
   const [city, setCity] = useState("");
   const [barName, setBarName] = useState("");
+  const [locationCoordinates, setLocationCoordinates] = useState<Coordinates | null>(null);
   const [pubId, setPubId] = useState("");
   const [pubs, setPubs] = useState<Pub[]>([]);
   const [pendingPub, setPendingPub] = useState<Omit<Pub, "id"> | null>(null);
@@ -204,6 +210,7 @@ export default function LogBeerPage() {
         })
       );
       const { latitude, longitude } = position.coords;
+      setLocationCoordinates({ latitude, longitude });
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
       );
@@ -265,6 +272,7 @@ export default function LogBeerPage() {
       latitude: Number(result.lat),
       longitude: Number(result.lon),
     });
+    setLocationCoordinates(null);
     setPubId("");
     setCity(resultCity);
     setBarName(name);
@@ -275,13 +283,32 @@ export default function LogBeerPage() {
   async function resolvePubForSave(): Promise<Omit<Pub, "id"> | null> {
     if (pendingPub || pubId || !barName.trim() || !city.trim()) return pendingPub;
 
-    const query = encodeURIComponent(`${barName.trim()}, ${city.trim()}, Czech Republic`);
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&q=${query}`
-    );
-    if (!response.ok) throw new Error("The address could not be located for the map.");
+    if (locationCoordinates) {
+      return {
+        name: barName.trim(),
+        city: city.trim(),
+        ...locationCoordinates,
+      };
+    }
 
-    const [result] = (await response.json()) as PubSearchResult[];
+    const queries = [
+      `${barName.trim()}, ${city.trim()}, Czech Republic`,
+      `${barName.trim()}, ${city.trim()}`,
+      barName.trim(),
+    ];
+    let result: PubSearchResult | undefined;
+    for (const queryText of queries) {
+      const query = encodeURIComponent(queryText);
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&accept-language=en&q=${query}`
+      );
+      if (!response.ok) continue;
+      const [candidate] = (await response.json()) as PubSearchResult[];
+      if (candidate) {
+        result = candidate;
+        break;
+      }
+    }
     if (!result || !Number.isFinite(Number(result.lat)) || !Number.isFinite(Number(result.lon))) {
       throw new Error("The address could not be located for the map.");
     }
@@ -545,7 +572,10 @@ export default function LogBeerPage() {
               <div className="flex gap-2">
                 <Input
                   value={barName}
-                  onChange={(e) => setBarName(e.target.value)}
+                  onChange={(e) => {
+                    setBarName(e.target.value);
+                    setLocationCoordinates(null);
+                  }}
                   placeholder="Enter an address or bar name"
                   className="min-w-0 flex-1 bg-amber-900/50 border-amber-700 text-amber-100 placeholder:text-amber-600"
                 />
@@ -619,7 +649,10 @@ export default function LogBeerPage() {
                 <Label className="text-amber-200">City</Label>
                 <Input
                   value={city}
-                  onChange={(e) => setCity(e.target.value)}
+                  onChange={(e) => {
+                    setCity(e.target.value);
+                    setLocationCoordinates(null);
+                  }}
                   placeholder="e.g. Prague, Brno, Vienna..."
                   list="city-suggestions"
                   className="bg-amber-900/50 border-amber-700 text-amber-100 placeholder:text-amber-600"
@@ -634,7 +667,10 @@ export default function LogBeerPage() {
                 <Label className="text-amber-200">Bar / Pub</Label>
                 <Input
                   value={barName}
-                  onChange={(e) => setBarName(e.target.value)}
+                  onChange={(e) => {
+                    setBarName(e.target.value);
+                    setLocationCoordinates(null);
+                  }}
                   placeholder="Bar name"
                   className="bg-amber-900/50 border-amber-700 text-amber-100 placeholder:text-amber-600"
                 />
