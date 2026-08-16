@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { BEER_STYLES, TRIP_CITIES, CZECH_BEERS } from "@/lib/utils";
 import { processBeerLog } from "@/lib/process-beer-log";
 import { compressIfNeeded } from "@/lib/compress-image";
@@ -59,7 +59,9 @@ export default function LogBeerPage() {
   const [searchingPubs, setSearchingPubs] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [locating, setLocating] = useState(false);
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState(() =>
+    typeof navigator === "undefined" ? true : navigator.onLine
+  );
   const [offlineCount, setOfflineCount] = useState(0);
   const [syncMessage, setSyncMessage] = useState("");
   const [notes, setNotes] = useState("");
@@ -75,7 +77,6 @@ export default function LogBeerPage() {
       await migrateLegacyOfflineLogs();
       setOfflineCount((await getOfflineLogs()).length);
     }
-    setIsOnline(navigator.onLine);
     initializeOfflineQueue();
     const updateOnlineState = () => setIsOnline(navigator.onLine);
     window.addEventListener("online", updateOnlineState);
@@ -271,6 +272,28 @@ export default function LogBeerPage() {
     setSearchError("Location selected. It will be added when this beer is saved.");
   }
 
+  async function resolvePubForSave(): Promise<Omit<Pub, "id"> | null> {
+    if (pendingPub || pubId || !barName.trim() || !city.trim()) return pendingPub;
+
+    const query = encodeURIComponent(`${barName.trim()}, ${city.trim()}, Czech Republic`);
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&q=${query}`
+    );
+    if (!response.ok) throw new Error("The address could not be located for the map.");
+
+    const [result] = (await response.json()) as PubSearchResult[];
+    if (!result || !Number.isFinite(Number(result.lat)) || !Number.isFinite(Number(result.lon))) {
+      throw new Error("The address could not be located for the map.");
+    }
+
+    return {
+      name: result.name?.trim() || barName.trim(),
+      city: city.trim(),
+      latitude: Number(result.lat),
+      longitude: Number(result.lon),
+    };
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (rating === 0) {
@@ -305,6 +328,18 @@ export default function LogBeerPage() {
       setSyncMessage("Beer saved on this phone and will sync when online.");
       setLoading(false);
       return;
+    }
+
+    let pubToSave: Omit<Pub, "id"> | null = pendingPub;
+    let mapWarning = "";
+    if (!pubId && !pendingPub && barName.trim() && city.trim()) {
+      try {
+        pubToSave = await resolvePubForSave();
+      } catch (mapFailure) {
+        mapWarning = mapFailure instanceof Error
+          ? mapFailure.message
+          : "The address could not be located for the map.";
+      }
     }
 
     let photoUrl: string | null = null;
@@ -346,12 +381,19 @@ export default function LogBeerPage() {
       return;
     }
 
-    if (pendingPub) {
-      const { data: savedPub, error: pubError } = await supabase
-        .from("pubs")
-        .insert(pendingPub)
-        .select("*")
-        .single();
+    if (pubToSave) {
+      const existingPub = pubs.find(
+        (pub) =>
+          pub.name.trim().toLowerCase() === pubToSave?.name.trim().toLowerCase() &&
+          pub.city.trim().toLowerCase() === pubToSave?.city.trim().toLowerCase()
+      );
+      const { data: savedPub, error: pubError } = existingPub
+        ? { data: existingPub, error: null }
+        : await supabase
+            .from("pubs")
+            .insert(pubToSave)
+            .select("*")
+            .single();
       if (pubError || !savedPub) {
         setError(
           `Beer saved, but the map location could not be added: ${
@@ -364,6 +406,10 @@ export default function LogBeerPage() {
           .update({ pub_id: savedPub.id })
           .eq("id", savedBeer.id);
       }
+    }
+
+    if (mapWarning) {
+      setError(`Beer saved, but the address was not added to the map: ${mapWarning}`);
     }
 
     const newAchievementNames = await processBeerLog(supabase, user.id);
@@ -412,21 +458,17 @@ export default function LogBeerPage() {
         </p>
       </div>
 
-      <div className={`mb-4 rounded-lg border p-3 text-sm ${
-        isOnline
-          ? "border-emerald-800 bg-emerald-950/30 text-emerald-300"
-          : "border-amber-600 bg-amber-900/70 text-amber-200"
-      }`}>
-        <p className="font-medium">{isOnline ? "Online" : "Offline mode"}</p>
-        <p className="mt-1 text-xs opacity-80">
-          {isOnline
-            ? offlineCount > 0
+      {(!isOnline || offlineCount > 0 || syncMessage) && (
+        <div className="mb-4 rounded-lg border border-amber-600 bg-amber-900/70 p-3 text-sm text-amber-200">
+          <p className="font-medium">{isOnline ? "Sync status" : "Offline mode"}</p>
+          <p className="mt-1 text-xs opacity-80">
+            {isOnline
               ? `${offlineCount} offline ${offlineCount === 1 ? "beer is" : "beers are"} syncing.`
-              : "Beer logs save to the group immediately."
-            : "Beer logs and photos are saved on this phone and sync automatically when you reconnect."}
-        </p>
-        {syncMessage && <p className="mt-1 text-xs">{syncMessage}</p>}
-      </div>
+              : "Beer logs and photos are saved on this phone and sync automatically when you reconnect."}
+          </p>
+          {syncMessage && <p className="mt-1 text-xs">{syncMessage}</p>}
+        </div>
+      )}
 
       <Card className="bg-amber-900/60 border-amber-700">
         <CardContent className="pt-6">
