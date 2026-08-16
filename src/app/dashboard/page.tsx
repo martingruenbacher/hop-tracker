@@ -20,6 +20,7 @@ import {
 import { Beer, Star, MapPin, Trophy, Share2, Compass, Target } from "lucide-react";
 import Link from "next/link";
 import { ACHIEVEMENTS } from "@/lib/achievements";
+import { processBeerLog } from "@/lib/process-beer-log";
 import { getTodayChallenge, isToday } from "@/lib/challenges";
 import {
   estimatePromille,
@@ -47,6 +48,8 @@ export default function DashboardPage() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
+
+      await processBeerLog(supabase, user.id);
 
       const [
         { data: prof },

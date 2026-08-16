@@ -568,6 +568,14 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
   },
 ];
 
+export const REVERSIBLE_HIDDEN_ACHIEVEMENT_KEYS = [
+  "local_treasure",
+  "last_call_explorer",
+  "leaderboard_ghost",
+  "the_underdog",
+  "the_outlier",
+] as const;
+
 export function checkNewAchievements(
   logs: BeerLog[],
   unlockedKeys: string[],

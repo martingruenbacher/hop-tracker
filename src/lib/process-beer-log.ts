@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { ACHIEVEMENTS, checkNewAchievements } from "@/lib/achievements";
+import {
+  ACHIEVEMENTS,
+  checkNewAchievements,
+  REVERSIBLE_HIDDEN_ACHIEVEMENT_KEYS,
+} from "@/lib/achievements";
 import { getLocalDate, getTodayChallenge, isToday } from "@/lib/challenges";
 import { BeerLog } from "@/lib/types";
 
@@ -52,7 +56,6 @@ export async function processBeerLog(
     .from("achievements")
     .select("achievement_key")
     .eq("user_id", userId);
-  const unlockedKeys = existingAchievements?.map((a) => a.achievement_key) ?? [];
   const tripEndDate = process.env.NEXT_PUBLIC_TRIP_END_DATE;
   const latestSnapshot = rankSnapshots?.[0] as { rank: number; captured_at: string } | undefined;
   const previousSnapshot = rankSnapshots?.[1] as { rank: number; captured_at: string } | undefined;
@@ -70,6 +73,24 @@ export async function processBeerLog(
     leaderboardGhost: Boolean(rankChangedWithinTenMinutes && previousSnapshot?.rank === 1 && latestSnapshot && latestSnapshot.rank > 1),
     underdog: Boolean(rankChangedWithinTenMinutes && previousSnapshot && previousSnapshot.rank > 3 && latestSnapshot && latestSnapshot.rank <= 3),
   };
+  const storedKeys = existingAchievements?.map((a) => a.achievement_key) ?? [];
+  const reversibleDefinitions = ACHIEVEMENTS.filter((achievement) =>
+    REVERSIBLE_HIDDEN_ACHIEVEMENT_KEYS.includes(
+      achievement.key as (typeof REVERSIBLE_HIDDEN_ACHIEVEMENT_KEYS)[number]
+    )
+  );
+  const invalidReversibleKeys = reversibleDefinitions
+    .filter((achievement) => !achievement.check(logs, {} as never, achievementContext))
+    .map((achievement) => achievement.key)
+    .filter((key) => storedKeys.includes(key));
+  if (invalidReversibleKeys.length > 0) {
+    await supabase
+      .from("achievements")
+      .delete()
+      .eq("user_id", userId)
+      .in("achievement_key", invalidReversibleKeys);
+  }
+  const unlockedKeys = storedKeys.filter((key) => !invalidReversibleKeys.includes(key));
   const newOnes = checkNewAchievements(logs, unlockedKeys, achievementContext);
   const plotArmor = ACHIEVEMENTS.find((achievement) => achievement.key === "plot_armor");
   if (plotArmor && newOnes.length >= 2 && !unlockedKeys.includes(plotArmor.key)) {
