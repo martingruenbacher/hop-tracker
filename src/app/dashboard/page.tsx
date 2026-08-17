@@ -34,6 +34,7 @@ export default function DashboardPage() {
   const [logs, setLogs] = useState<BeerLog[]>([]);
   const [allLogs, setAllLogs] = useState<BeerLog[]>([]);
   const [groupLogs, setGroupLogs] = useState<BeerLog[]>([]);
+  const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
   const [unlockedKeys, setUnlockedKeys] = useState<string[]>([]);
   const [challengePoints, setChallengePoints] = useState(0);
   const [completedChallenges, setCompletedChallenges] = useState(0);
@@ -60,6 +61,7 @@ export default function DashboardPage() {
         { data: everyone },
         { data: allGroupLogs },
         { data: completions },
+        { data: groupProfiles },
       ] =
         await Promise.all([
           supabase.from("profiles").select("*").eq("id", user.id).single(),
@@ -81,6 +83,7 @@ export default function DashboardPage() {
             .from("challenge_completions")
             .select("points, challenge_key, challenge_date")
             .eq("user_id", user.id),
+          supabase.from("profiles").select("*"),
         ]);
 
       if (!prof) {
@@ -91,6 +94,7 @@ export default function DashboardPage() {
       setLogs(myLogs ?? []);
       setAllLogs(everyone ?? []);
       setGroupLogs(allGroupLogs ?? []);
+      setAllProfiles((groupProfiles as Profile[]) ?? []);
       setUnlockedKeys(achiev?.map((a) => a.achievement_key) ?? []);
       setChallengePoints(
         (completions ?? []).reduce((sum, item) => sum + item.points, 0)
@@ -197,23 +201,32 @@ export default function DashboardPage() {
     sex: profile?.sex ?? "male",
   };
   const estimatedPromille = estimatePromille(logs, promilleSettings, now);
-  const alcoholTimeline = [...logs]
-    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-    .map((log, index, sortedLogs) => {
-      const timestamp = new Date(log.created_at);
-      return {
-        time: timestamp.getTime(),
-        label: formatDate(log.created_at),
-        level: estimatePromille(sortedLogs.slice(0, index + 1), promilleSettings, timestamp),
-      };
+  const alcoholTimelineLogs = [...groupLogs].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+  const alcoholTimelineTimes = [...new Set([
+    ...alcoholTimelineLogs.map((log) => new Date(log.created_at).getTime()),
+    now.getTime(),
+  ])].sort((a, b) => a - b);
+  const alcoholTimelinePlayers = allProfiles.filter((player) =>
+    alcoholTimelineLogs.some((log) => log.user_id === player.id)
+  );
+  const alcoholTimeline = alcoholTimelineTimes.map((time) => {
+    const point: Record<string, number> = { time };
+    alcoholTimelinePlayers.forEach((player) => {
+      const playerLogs = alcoholTimelineLogs.filter((log) => log.user_id === player.id);
+      const logsAtTime = playerLogs.filter(
+        (log) => new Date(log.created_at).getTime() <= time
+      );
+      point[player.id] = estimatePromille(
+        logsAtTime,
+        { weightKg: player.weight_kg, sex: player.sex },
+        new Date(time)
+      );
     });
-  if (alcoholTimeline.length > 0) {
-    alcoholTimeline.push({
-      time: now.getTime(),
-      label: "Now",
-      level: estimatedPromille,
-    });
-  }
+    return point;
+  });
+  const alcoholTimelineColors = ["#f59e0b", "#34d399", "#60a5fa", "#f472b6", "#a78bfa", "#fb7185"];
 
   async function shareRecap() {
     const recap = `Hop Tracker recap: ${logs.length} beers, ${uniqueBars} pubs, ${avgRating} average rating. Top beer: ${topBeer?.beer_name ?? "TBD"}.`;
@@ -616,14 +629,14 @@ export default function DashboardPage() {
       <Card className="bg-amber-900/60 border-amber-700">
         <CardHeader className="pb-2">
           <CardTitle className="text-amber-100 text-base">
-            Estimated alcohol level over time
+            Group alcohol levels over time
           </CardTitle>
           <p className="text-xs text-amber-500">
-            From your first logged beer to now. Educational estimate only.
+            Every player from their first logged beer to now. Educational estimate only.
           </p>
         </CardHeader>
         <CardContent>
-          {alcoholTimeline.length < 2 ? (
+          {alcoholTimelinePlayers.length === 0 || alcoholTimeline.length < 2 ? (
             <p className="py-8 text-center text-sm text-amber-500">
               Log at least one beer to start your alcohol-level timeline.
             </p>
@@ -658,14 +671,18 @@ export default function DashboardPage() {
                     color: "#fef3c7",
                   }}
                 />
-                <Line
-                  type="monotone"
-                  dataKey="level"
-                  stroke="#f59e0b"
-                  strokeWidth={3}
-                  dot={{ r: 4, fill: "#fbbf24", stroke: "#451a03", strokeWidth: 2 }}
-                  activeDot={{ r: 6, fill: "#fde68a" }}
-                />
+                {alcoholTimelinePlayers.map((player, index) => (
+                  <Line
+                    key={player.id}
+                    type="monotone"
+                    dataKey={player.id}
+                    name={player.player_name}
+                    stroke={alcoholTimelineColors[index % alcoholTimelineColors.length]}
+                    strokeWidth={3}
+                    dot={{ r: 3, fill: alcoholTimelineColors[index % alcoholTimelineColors.length], stroke: "#451a03", strokeWidth: 2 }}
+                    activeDot={{ r: 6 }}
+                  />
+                ))}
               </LineChart>
             </ResponsiveContainer>
           )}
