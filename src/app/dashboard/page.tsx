@@ -43,6 +43,7 @@ export default function DashboardPage() {
   const [isLive, setIsLive] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
   const [now, setNow] = useState(() => new Date());
+  const [alcoholChartPlayer, setAlcoholChartPlayer] = useState("all");
 
   useEffect(() => {
     const supabase = createClient();
@@ -211,9 +212,12 @@ export default function DashboardPage() {
   const alcoholTimelinePlayers = allProfiles.filter((player) =>
     alcoholTimelineLogs.some((log) => log.user_id === player.id)
   );
+  const selectedAlcoholPlayers = alcoholChartPlayer === "all"
+    ? alcoholTimelinePlayers
+    : alcoholTimelinePlayers.filter((player) => player.id === alcoholChartPlayer);
   const alcoholTimeline = alcoholTimelineTimes.map((time) => {
     const point: Record<string, number> = { time };
-    alcoholTimelinePlayers.forEach((player) => {
+    selectedAlcoholPlayers.forEach((player) => {
       const playerLogs = alcoholTimelineLogs.filter((log) => log.user_id === player.id);
       const logsAtTime = playerLogs.filter(
         (log) => new Date(log.created_at).getTime() <= time
@@ -636,7 +640,23 @@ export default function DashboardPage() {
           </p>
         </CardHeader>
         <CardContent>
-          {alcoholTimelinePlayers.length === 0 || alcoholTimeline.length < 2 ? (
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <label htmlFor="alcohol-chart-player" className="text-xs font-medium text-amber-300">
+              Show player
+            </label>
+            <select
+              id="alcohol-chart-player"
+              value={alcoholChartPlayer}
+              onChange={(event) => setAlcoholChartPlayer(event.target.value)}
+              className="h-10 w-full rounded-md border border-amber-700 bg-amber-900/60 px-3 text-sm text-amber-100 sm:w-auto sm:min-w-56"
+            >
+              <option value="all">All players</option>
+              {alcoholTimelinePlayers.map((player) => (
+                <option key={player.id} value={player.id}>{player.player_name}</option>
+              ))}
+            </select>
+          </div>
+          {selectedAlcoholPlayers.length === 0 || alcoholTimeline.length < 2 ? (
             <p className="py-8 text-center text-sm text-amber-500">
               Log at least one beer to start your alcohol-level timeline.
             </p>
@@ -686,9 +706,9 @@ export default function DashboardPage() {
               </LineChart>
             </ResponsiveContainer>
           )}
-          {alcoholTimelinePlayers.length > 0 && (
+          {selectedAlcoholPlayers.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 border-t border-amber-800/70 pt-3">
-              {alcoholTimelinePlayers.map((player, index) => {
+              {selectedAlcoholPlayers.map((player, index) => {
                 const color = alcoholTimelineColors[index % alcoholTimelineColors.length];
                 return (
                   <div key={player.id} className="flex min-w-0 items-center gap-2 text-xs text-amber-200">
