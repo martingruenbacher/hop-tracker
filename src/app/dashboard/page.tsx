@@ -686,6 +686,23 @@ export default function DashboardPage() {
               </LineChart>
             </ResponsiveContainer>
           )}
+          {alcoholTimelinePlayers.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 border-t border-amber-800/70 pt-3">
+              {alcoholTimelinePlayers.map((player, index) => {
+                const color = alcoholTimelineColors[index % alcoholTimelineColors.length];
+                return (
+                  <div key={player.id} className="flex min-w-0 items-center gap-2 text-xs text-amber-200">
+                    <span
+                      aria-hidden="true"
+                      className="h-3 w-3 shrink-0 rounded-full"
+                      style={{ backgroundColor: color }}
+                    />
+                    <span className="max-w-[12rem] truncate">{player.player_name}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <p className="mt-3 rounded-lg border border-red-900/70 bg-red-950/30 p-3 text-xs leading-5 text-red-300">
             This assumes every beer is 500 ml at 5% ABV and does not account for food, health, medication, timing inaccuracies, or individual metabolism. Never use it to decide whether you can drive.
           </p>
