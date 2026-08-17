@@ -11,6 +11,8 @@ import { Progress } from "@/components/ui/progress";
 import {
   BarChart,
   Bar,
+  Line,
+  LineChart,
   XAxis,
   YAxis,
   Tooltip,
@@ -195,6 +197,23 @@ export default function DashboardPage() {
     sex: profile?.sex ?? "male",
   };
   const estimatedPromille = estimatePromille(logs, promilleSettings, now);
+  const alcoholTimeline = [...logs]
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    .map((log, index, sortedLogs) => {
+      const timestamp = new Date(log.created_at);
+      return {
+        time: timestamp.getTime(),
+        label: formatDate(log.created_at),
+        level: estimatePromille(sortedLogs.slice(0, index + 1), promilleSettings, timestamp),
+      };
+    });
+  if (alcoholTimeline.length > 0) {
+    alcoholTimeline.push({
+      time: now.getTime(),
+      label: "Now",
+      level: estimatedPromille,
+    });
+  }
 
   async function shareRecap() {
     const recap = `Hop Tracker recap: ${logs.length} beers, ${uniqueBars} pubs, ${avgRating} average rating. Top beer: ${topBeer?.beer_name ?? "TBD"}.`;
@@ -591,6 +610,68 @@ export default function DashboardPage() {
           >
             Explore the trip timeline
           </Link>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-amber-900/60 border-amber-700">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-amber-100 text-base">
+            Estimated alcohol level over time
+          </CardTitle>
+          <p className="text-xs text-amber-500">
+            From your first logged beer to now. Educational estimate only.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {alcoholTimeline.length < 2 ? (
+            <p className="py-8 text-center text-sm text-amber-500">
+              Log at least one beer to start your alcohol-level timeline.
+            </p>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={alcoholTimeline} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
+                <XAxis
+                  dataKey="time"
+                  type="number"
+                  domain={["dataMin", "dataMax"]}
+                  scale="time"
+                  tickFormatter={(value) => formatDate(new Date(value).toISOString())}
+                  tick={{ fill: "#fbbf24", fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  domain={[0, "auto"]}
+                  tickFormatter={(value) => `${Number(value).toFixed(1)}‰`}
+                  tick={{ fill: "#fbbf24", fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={42}
+                />
+                <Tooltip
+                  labelFormatter={(value) => formatDate(new Date(Number(value)).toISOString())}
+                  formatter={(value) => [`${Number(value).toFixed(2)}‰`, "Estimated level"]}
+                  contentStyle={{
+                    background: "#451a03",
+                    border: "1px solid #92400e",
+                    borderRadius: 8,
+                    color: "#fef3c7",
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="level"
+                  stroke="#f59e0b"
+                  strokeWidth={3}
+                  dot={{ r: 4, fill: "#fbbf24", stroke: "#451a03", strokeWidth: 2 }}
+                  activeDot={{ r: 6, fill: "#fde68a" }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+          <p className="mt-3 rounded-lg border border-red-900/70 bg-red-950/30 p-3 text-xs leading-5 text-red-300">
+            This assumes every beer is 500 ml at 5% ABV and does not account for food, health, medication, timing inaccuracies, or individual metabolism. Never use it to decide whether you can drive.
+          </p>
         </CardContent>
       </Card>
 
