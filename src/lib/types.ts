@@ -15,6 +15,7 @@ export interface BeerLog {
   beer_name: string;
   brewery: string | null;
   style: string | null;
+  volume_liters: number;
   rating: number;
   city: City | null;
   bar_name: string | null;

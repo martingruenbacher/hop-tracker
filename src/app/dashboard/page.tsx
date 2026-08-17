@@ -339,7 +339,7 @@ export default function DashboardPage() {
             </p>
           </div>
           <p className="mt-4 rounded-lg border border-red-900/70 bg-red-950/30 p-3 text-xs leading-5 text-red-300">
-            This is only a rough educational estimate. It assumes each beer is 500 ml at 5% ABV and a metabolism of 0.15‰ per hour. It does not account for food, timing inaccuracies, health, medication, or individual metabolism. Never use it to decide whether you can drive or make a safety decision.
+            This is only a rough educational estimate using each logged beer amount, an assumed 5% ABV, and a metabolism of 0.15‰ per hour. It does not account for food, timing inaccuracies, health, medication, or individual metabolism. Never use it to decide whether you can drive or make a safety decision.
           </p>
         </CardContent>
       </Card>
@@ -724,7 +724,7 @@ export default function DashboardPage() {
             </div>
           )}
           <p className="mt-3 rounded-lg border border-red-900/70 bg-red-950/30 p-3 text-xs leading-5 text-red-300">
-            This assumes every beer is 500 ml at 5% ABV and does not account for food, health, medication, timing inaccuracies, or individual metabolism. Never use it to decide whether you can drive.
+            This uses each logged beer amount with an assumed 5% ABV and does not account for food, health, medication, timing inaccuracies, or individual metabolism. Never use it to decide whether you can drive.
           </p>
         </CardContent>
       </Card>

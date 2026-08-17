@@ -4,6 +4,7 @@ export interface OfflineBeerLog {
   beerName: string;
   brewery: string | null;
   style: string | null;
+  volumeLiters?: number;
   rating: number;
   city: string | null;
   barName: string | null;

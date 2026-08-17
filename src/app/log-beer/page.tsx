@@ -66,6 +66,7 @@ export default function LogBeerPage() {
   const [beerName, setBeerName] = useState("");
   const [brewery, setBrewery] = useState("");
   const [style, setStyle] = useState("");
+  const [volumeLiters, setVolumeLiters] = useState("0.5");
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [city, setCity] = useState("");
@@ -144,6 +145,7 @@ export default function LogBeerPage() {
           beer_name: queued.beerName,
           brewery: queued.brewery,
           style: queued.style,
+          volume_liters: queued.volumeLiters ?? 0.5,
           rating: queued.rating,
           city: queued.city,
           bar_name: queued.barName,
@@ -363,6 +365,7 @@ export default function LogBeerPage() {
         beerName,
         brewery: brewery || null,
         style: style || null,
+        volumeLiters: Number(volumeLiters),
         rating,
         city: city || null,
         barName: barName || null,
@@ -440,6 +443,7 @@ export default function LogBeerPage() {
       beer_name: beerName,
       brewery: brewery || null,
       style: style || null,
+      volume_liters: Number(volumeLiters),
       rating,
       city: city || null,
       bar_name: barName || null,
@@ -564,6 +568,22 @@ export default function LogBeerPage() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-amber-200">Beer amount *</Label>
+              <Select value={volumeLiters} onValueChange={(value) => setVolumeLiters(value ?? "0.5")}>
+                <SelectTrigger className="bg-amber-900/50 border-amber-700 text-amber-100">
+                  <SelectValue placeholder="Select amount" />
+                </SelectTrigger>
+                <SelectContent className="bg-amber-900 border-amber-700">
+                  {[["0.2", "0.2 l"], ["0.3", "0.3 l"], ["0.4", "0.4 l"], ["0.5", "0.5 l"], ["0.75", "0.75 l"], ["1", "1.0 l"]].map(([value, label]) => (
+                    <SelectItem key={value} value={value} className="text-amber-100 focus:bg-amber-700">
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {pubs.length > 0 && (

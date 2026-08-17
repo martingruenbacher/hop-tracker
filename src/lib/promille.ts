@@ -28,7 +28,7 @@ export function estimatePromille(
         0,
         (now.getTime() - new Date(log.created_at).getTime()) / 3_600_000
       );
-      const alcoholGrams = 500 * 0.05 * 0.789;
+      const alcoholGrams = (log.volume_liters ?? 0.5) * 1000 * 0.05 * 0.789;
       const initialPromille = alcoholGrams / (weightKg * distributionRatio);
       return level + Math.max(0, initialPromille - hoursSinceDrink * metabolismPerHour);
     }, 0)

@@ -13,6 +13,7 @@ import { estimatePeakPromille } from "@/lib/promille";
 interface PlayerStats {
   profile: Profile;
   total: number;
+  liters: number;
   avg: number;
   unique: number;
   cities: number;
@@ -24,6 +25,7 @@ interface PlayerStats {
 
 const categories = [
   { key: "total", label: "Most Beers", icon: "🍺", valueKey: "total", unit: "beers" },
+  { key: "liters", label: "Most Liters", icon: "🍻", valueKey: "liters", unit: "liters" },
   { key: "avg", label: "Highest Avg", icon: "⭐", valueKey: "avg", unit: "avg ★" },
   { key: "unique", label: "Variety", icon: "🌈", valueKey: "unique", unit: "unique beers" },
   { key: "achievements", label: "Achievements", icon: "🏆", valueKey: "achievements", unit: "achievements" },
@@ -78,7 +80,7 @@ function RankList({
             <div className="max-w-[4.5rem] text-right shrink-0 pt-1 sm:pt-0">
               <p className="text-xl sm:text-2xl font-bold text-amber-300">
                 {typeof s[valueKey] === "number"
-                  ? (s[valueKey] as number).toFixed(valueKey === "avg" || valueKey === "peakPromille" ? 2 : 0)
+                  ? (s[valueKey] as number).toFixed(valueKey === "avg" || valueKey === "liters" || valueKey === "peakPromille" ? 2 : 0)
                   : String(s[valueKey])}
               </p>
               <p className="text-xs text-amber-500">{unit}</p>
@@ -145,6 +147,10 @@ export default function LeaderboardPage() {
         return {
           profile: p,
           total: myLogs.length,
+          liters: myLogs.reduce(
+            (sum: number, log: Partial<BeerLog>) => sum + (log.volume_liters ?? 0.5),
+            0
+          ),
           avg:
             myLogs.length > 0
               ? myLogs.reduce(

@@ -17,6 +17,7 @@ create table public.beer_logs (
   beer_name text not null,
   brewery text,
   style text,
+  volume_liters numeric not null default 0.5 check (volume_liters > 0 and volume_liters <= 5),
   rating integer not null check (rating between 1 and 5),
   city text,
   bar_name text,
