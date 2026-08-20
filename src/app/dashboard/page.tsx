@@ -397,6 +397,23 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Link
+          href="/photos"
+          className="rounded-xl border border-amber-700 bg-amber-900/60 p-4 text-sm font-medium text-amber-200 transition-colors hover:bg-amber-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+        >
+          View photo wall
+          <span className="mt-1 block text-xs font-normal text-amber-500">Browse photos, reactions, and comments</span>
+        </Link>
+        <Link
+          href="/timeline"
+          className="rounded-xl border border-amber-700 bg-amber-900/60 p-4 text-sm font-medium text-amber-200 transition-colors hover:bg-amber-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+        >
+          View trip timeline
+          <span className="mt-1 block text-xs font-normal text-amber-500">Replay the trip day by day</span>
+        </Link>
+      </div>
+
       {/* Trip itinerary */}
       <Card className="bg-amber-900/60 border-amber-700">
         <CardHeader className="pb-2 flex flex-row items-center justify-between">
