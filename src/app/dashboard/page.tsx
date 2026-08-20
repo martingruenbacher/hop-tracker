@@ -25,6 +25,7 @@ import { ACHIEVEMENTS } from "@/lib/achievements";
 import { processBeerLog } from "@/lib/process-beer-log";
 import { getTodayChallenge, isToday } from "@/lib/challenges";
 import {
+  buildPromilleTimeline,
   estimatePromille,
   PromilleSettings,
 } from "@/lib/promille";
@@ -205,28 +206,28 @@ export default function DashboardPage() {
   const alcoholTimelineLogs = [...groupLogs].sort(
     (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
-  const alcoholTimelineTimes = [...new Set([
-    ...alcoholTimelineLogs.map((log) => new Date(log.created_at).getTime()),
-    now.getTime(),
-  ])].sort((a, b) => a - b);
   const alcoholTimelinePlayers = allProfiles.filter((player) =>
     alcoholTimelineLogs.some((log) => log.user_id === player.id)
   );
   const selectedAlcoholPlayers = alcoholChartPlayer === "all"
     ? alcoholTimelinePlayers
     : alcoholTimelinePlayers.filter((player) => player.id === alcoholChartPlayer);
+  const playerTimelines = selectedAlcoholPlayers.map((player) => ({
+    player,
+    points: buildPromilleTimeline(
+      alcoholTimelineLogs.filter((log) => log.user_id === player.id),
+      { weightKg: player.weight_kg, sex: player.sex },
+      now
+    ),
+  }));
+  const alcoholTimelineTimes = [...new Set(
+    playerTimelines.flatMap(({ points }) => points.map((point) => point.time))
+  )].sort((a, b) => a - b);
   const alcoholTimeline = alcoholTimelineTimes.map((time) => {
     const point: Record<string, number> = { time };
-    selectedAlcoholPlayers.forEach((player) => {
-      const playerLogs = alcoholTimelineLogs.filter((log) => log.user_id === player.id);
-      const logsAtTime = playerLogs.filter(
-        (log) => new Date(log.created_at).getTime() <= time
-      );
-      point[player.id] = estimatePromille(
-        logsAtTime,
-        { weightKg: player.weight_kg, sex: player.sex },
-        new Date(time)
-      );
+    playerTimelines.forEach(({ player, points }) => {
+      const matchingPoint = points.find((timelinePoint) => timelinePoint.time === time);
+      if (matchingPoint) point[player.id] = matchingPoint.level;
     });
     return point;
   });
@@ -691,7 +692,7 @@ export default function DashboardPage() {
                     color: "#fef3c7",
                   }}
                 />
-                {alcoholTimelinePlayers.map((player, index) => (
+                {selectedAlcoholPlayers.map((player, index) => (
                   <Line
                     key={player.id}
                     type="monotone"
