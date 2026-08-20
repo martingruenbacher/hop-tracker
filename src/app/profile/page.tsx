@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { User, Camera, Trash2 } from "lucide-react";
+import { User, Camera, Pencil, Trash2 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { compressIfNeeded } from "@/lib/compress-image";
 import { ACHIEVEMENTS } from "@/lib/achievements";
@@ -372,6 +372,16 @@ export default function ProfilePage() {
                     <span className="text-xs text-amber-600">
                       {formatDate(log.created_at)}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/edit-beer/${log.id}`)}
+                      disabled={deletingId === log.id}
+                      aria-label={`Edit ${log.beer_name}`}
+                      title="Edit beer log"
+                      className="p-1 text-amber-600 hover:text-amber-200 disabled:opacity-50"
+                    >
+                      <Pencil size={15} />
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleDelete(log)}

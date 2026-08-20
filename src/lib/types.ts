@@ -19,6 +19,7 @@ export interface BeerLog {
   rating: number;
   city: City | null;
   bar_name: string | null;
+  pub_id: string | null;
   notes: string | null;
   photo_url: string | null;
   created_at: string;
