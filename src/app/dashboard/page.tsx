@@ -24,11 +24,7 @@ import Link from "next/link";
 import { ACHIEVEMENTS } from "@/lib/achievements";
 import { processBeerLog } from "@/lib/process-beer-log";
 import { getTodayChallenge, isToday } from "@/lib/challenges";
-import {
-  buildPromilleTimeline,
-  estimatePromille,
-  PromilleSettings,
-} from "@/lib/promille";
+import { estimatePromille, PromilleSettings } from "@/lib/promille";
 
 export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -44,7 +40,7 @@ export default function DashboardPage() {
   const [isLive, setIsLive] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
   const [now, setNow] = useState(() => new Date());
-  const [alcoholChartPlayer, setAlcoholChartPlayer] = useState("all");
+  const [alcoholChartPlayers, setAlcoholChartPlayers] = useState<string[]>([]);
   const [alcoholChartDay, setAlcoholChartDay] = useState("all");
 
   useEffect(() => {
@@ -216,30 +212,40 @@ export default function DashboardPage() {
       return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
     })
   )].sort();
-  const selectedAlcoholPlayers = alcoholChartPlayer === "all"
+  const selectedAlcoholPlayers = alcoholChartPlayers.length === 0
     ? alcoholTimelinePlayers
-    : alcoholTimelinePlayers.filter((player) => player.id === alcoholChartPlayer);
+    : alcoholTimelinePlayers.filter((player) => alcoholChartPlayers.includes(player.id));
+  const alcoholTimelineStart = alcoholTimelineLogs[0]
+    ? new Date(alcoholTimelineLogs[0].created_at).getTime()
+    : now.getTime();
+  const alcoholTimelineInterval = 15 * 60_000;
+  const alcoholTimelineTimes = [...new Set([
+    ...Array.from(
+      { length: Math.max(1, Math.floor((now.getTime() - alcoholTimelineStart) / alcoholTimelineInterval) + 1) },
+      (_, index) => alcoholTimelineStart + index * alcoholTimelineInterval
+    ),
+    ...alcoholTimelineLogs.map((log) => new Date(log.created_at).getTime()),
+    now.getTime(),
+  ])].sort((a, b) => a - b);
   const playerTimelines = selectedAlcoholPlayers.map((player) => ({
     player,
-    points: buildPromilleTimeline(
-      alcoholTimelineLogs.filter((log) => log.user_id === player.id),
-      { weightKg: player.weight_kg, sex: player.sex },
-      now
-    ),
+    logs: alcoholTimelineLogs.filter((log) => log.user_id === player.id),
     beerTimes: new Set(
       alcoholTimelineLogs
         .filter((log) => log.user_id === player.id)
         .map((log) => new Date(log.created_at).getTime())
     ),
   }));
-  const alcoholTimelineTimes = [...new Set(
-    playerTimelines.flatMap(({ points }) => points.map((point) => point.time))
-  )].sort((a, b) => a - b);
   const alcoholTimeline = alcoholTimelineTimes.map((time) => {
     const point: Record<string, number> = { time };
-    playerTimelines.forEach(({ player, points }) => {
-      const matchingPoint = points.find((timelinePoint) => timelinePoint.time === time);
-      if (matchingPoint) point[player.id] = matchingPoint.level;
+    playerTimelines.forEach(({ player, logs }) => {
+      if (logs.some((log) => new Date(log.created_at).getTime() <= time)) {
+        point[player.id] = estimatePromille(
+          logs,
+          { weightKg: player.weight_kg, sex: player.sex },
+          new Date(time)
+        );
+      }
     });
     return point;
   }).filter((point) => {
@@ -661,22 +667,42 @@ export default function DashboardPage() {
           </p>
         </CardHeader>
         <CardContent>
-          <div className="mb-3 grid gap-2 sm:grid-cols-2">
-            <div className="space-y-1">
-              <label htmlFor="alcohol-chart-player" className="text-xs font-medium text-amber-300">
-                Show player
-              </label>
-              <select
-                id="alcohol-chart-player"
-                value={alcoholChartPlayer}
-                onChange={(event) => setAlcoholChartPlayer(event.target.value)}
-                className="h-10 w-full rounded-md border border-amber-700 bg-amber-900/60 px-3 text-sm text-amber-100"
-              >
-                <option value="all">All players</option>
-                {alcoholTimelinePlayers.map((player) => (
-                  <option key={player.id} value={player.id}>{player.player_name}</option>
-                ))}
-              </select>
+          <div className="mb-3 grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-amber-300">Compare players</p>
+                <button
+                  type="button"
+                  onClick={() => setAlcoholChartPlayers([])}
+                  className="text-xs text-amber-300 underline hover:text-amber-100"
+                >
+                  Select all
+                </button>
+              </div>
+              <div className="max-h-36 space-y-1 overflow-y-auto rounded-md border border-amber-700 bg-amber-900/60 p-2">
+                {alcoholTimelinePlayers.map((player) => {
+                  const checked = alcoholChartPlayers.length === 0 || alcoholChartPlayers.includes(player.id);
+                  return (
+                    <label key={player.id} className="flex min-h-9 cursor-pointer items-center gap-2 rounded px-2 text-sm text-amber-100 hover:bg-amber-800/70">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          const allIds = alcoholTimelinePlayers.map((item) => item.id);
+                          const next = alcoholChartPlayers.length === 0
+                            ? allIds.filter((id) => id !== player.id)
+                            : alcoholChartPlayers.includes(player.id)
+                              ? alcoholChartPlayers.filter((id) => id !== player.id)
+                              : [...alcoholChartPlayers, player.id];
+                          setAlcoholChartPlayers(next.length === allIds.length ? [] : next);
+                        }}
+                        className="h-4 w-4 accent-amber-400"
+                      />
+                      <span className="truncate">{player.player_name}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
             <div className="space-y-1">
               <label htmlFor="alcohol-chart-day" className="text-xs font-medium text-amber-300">
