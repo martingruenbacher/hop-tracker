@@ -45,6 +45,7 @@ export default function DashboardPage() {
   const [shareMessage, setShareMessage] = useState("");
   const [now, setNow] = useState(() => new Date());
   const [alcoholChartPlayer, setAlcoholChartPlayer] = useState("all");
+  const [alcoholChartDay, setAlcoholChartDay] = useState("all");
 
   useEffect(() => {
     const supabase = createClient();
@@ -209,6 +210,12 @@ export default function DashboardPage() {
   const alcoholTimelinePlayers = allProfiles.filter((player) =>
     alcoholTimelineLogs.some((log) => log.user_id === player.id)
   );
+  const alcoholTimelineDays = [...new Set(
+    alcoholTimelineLogs.map((log) => {
+      const date = new Date(log.created_at);
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    })
+  )].sort();
   const selectedAlcoholPlayers = alcoholChartPlayer === "all"
     ? alcoholTimelinePlayers
     : alcoholTimelinePlayers.filter((player) => player.id === alcoholChartPlayer);
@@ -230,6 +237,11 @@ export default function DashboardPage() {
       if (matchingPoint) point[player.id] = matchingPoint.level;
     });
     return point;
+  }).filter((point) => {
+    if (alcoholChartDay === "all") return true;
+    const date = new Date(point.time);
+    const pointDay = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    return pointDay === alcoholChartDay;
   });
   const alcoholTimelineColors = ["#f59e0b", "#34d399", "#60a5fa", "#f472b6", "#a78bfa", "#fb7185"];
 
@@ -641,21 +653,39 @@ export default function DashboardPage() {
           </p>
         </CardHeader>
         <CardContent>
-          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <label htmlFor="alcohol-chart-player" className="text-xs font-medium text-amber-300">
-              Show player
-            </label>
-            <select
-              id="alcohol-chart-player"
-              value={alcoholChartPlayer}
-              onChange={(event) => setAlcoholChartPlayer(event.target.value)}
-              className="h-10 w-full rounded-md border border-amber-700 bg-amber-900/60 px-3 text-sm text-amber-100 sm:w-auto sm:min-w-56"
-            >
-              <option value="all">All players</option>
-              {alcoholTimelinePlayers.map((player) => (
-                <option key={player.id} value={player.id}>{player.player_name}</option>
-              ))}
-            </select>
+          <div className="mb-3 grid gap-2 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label htmlFor="alcohol-chart-player" className="text-xs font-medium text-amber-300">
+                Show player
+              </label>
+              <select
+                id="alcohol-chart-player"
+                value={alcoholChartPlayer}
+                onChange={(event) => setAlcoholChartPlayer(event.target.value)}
+                className="h-10 w-full rounded-md border border-amber-700 bg-amber-900/60 px-3 text-sm text-amber-100"
+              >
+                <option value="all">All players</option>
+                {alcoholTimelinePlayers.map((player) => (
+                  <option key={player.id} value={player.id}>{player.player_name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="alcohol-chart-day" className="text-xs font-medium text-amber-300">
+                Show day
+              </label>
+              <select
+                id="alcohol-chart-day"
+                value={alcoholChartDay}
+                onChange={(event) => setAlcoholChartDay(event.target.value)}
+                className="h-10 w-full rounded-md border border-amber-700 bg-amber-900/60 px-3 text-sm text-amber-100"
+              >
+                <option value="all">All days</option>
+                {alcoholTimelineDays.map((day) => (
+                  <option key={day} value={day}>{new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</option>
+                ))}
+              </select>
+            </div>
           </div>
           {selectedAlcoholPlayers.length === 0 || alcoholTimeline.length < 2 ? (
             <p className="py-8 text-center text-sm text-amber-500">
