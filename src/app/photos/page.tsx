@@ -2,12 +2,12 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useMemo, useState } from "react";
-import { Camera, ChevronLeft, ChevronRight, Download, Image as ImageIcon, Share2, Trophy } from "lucide-react";
+import { Camera, ChevronLeft, ChevronRight, Download, Image as ImageIcon, MessageCircle, Send, Share2, Trophy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { processBeerLog } from "@/lib/process-beer-log";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { TRIP_CITIES } from "@/lib/utils";
+import { formatDate, TRIP_CITIES } from "@/lib/utils";
 
 type PhotoLog = {
   id: string;
@@ -37,6 +37,14 @@ type PhotoReaction = {
   user_id: string;
   reaction: ReactionKey;
 };
+type PhotoComment = {
+  id: string;
+  beer_log_id: string;
+  user_id: string;
+  comment: string;
+  created_at: string;
+  profiles?: { player_name: string } | { player_name: string }[] | null;
+};
 
 const REACTIONS: { key: ReactionKey; label: string; icon: string }[] = [
   { key: "cheers", label: "Cheers", icon: "🍺" },
@@ -64,6 +72,9 @@ export default function PhotosPage() {
   const [photos, setPhotos] = useState<PhotoLog[]>([]);
   const [groupLogs, setGroupLogs] = useState<GroupLog[]>([]);
   const [reactionCounts, setReactionCounts] = useState<Record<string, ReactionCounts>>({});
+  const [comments, setComments] = useState<Record<string, PhotoComment[]>>({});
+  const [commentDraft, setCommentDraft] = useState("");
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [myReactions, setMyReactions] = useState<Record<string, ReactionKey>>({});
   const [playerFilter, setPlayerFilter] = useState("");
   const [cityFilter, setCityFilter] = useState("");
@@ -115,6 +126,22 @@ export default function PhotosPage() {
           });
           setReactionCounts(counts);
           setMyReactions(mine);
+        }
+      }
+      if (photoIds.length > 0) {
+        const { data: commentData, error: commentError } = await supabase
+          .from("photo_comments")
+          .select("id, beer_log_id, user_id, comment, created_at, profiles(player_name)")
+          .in("beer_log_id", photoIds)
+          .order("created_at", { ascending: true });
+        if (commentError) {
+          setError(commentError.message);
+        } else {
+          const grouped: Record<string, PhotoComment[]> = {};
+          (commentData as PhotoComment[]).forEach((comment) => {
+            grouped[comment.beer_log_id] = [...(grouped[comment.beer_log_id] ?? []), comment];
+          });
+          setComments(grouped);
         }
       }
       setLoading(false);
@@ -184,6 +211,7 @@ export default function PhotosPage() {
   }, [groupLogs]);
 
   const selectedPhoto = selectedPhotoIndex !== null ? filteredPhotos[selectedPhotoIndex] ?? null : null;
+  const selectedPhotoComments = selectedPhoto ? comments[selectedPhoto.id] ?? [] : [];
 
   const openPhoto = (index: number) => setSelectedPhotoIndex(index);
   const showPreviousPhoto = () => {
@@ -391,6 +419,41 @@ export default function PhotosPage() {
     }
   }
 
+  async function submitComment() {
+    if (!selectedPhoto || !commentDraft.trim() || commentSubmitting) return;
+    setCommentSubmitting(true);
+    setError("");
+    const supabase = createClient();
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) {
+      setError("Sign in to comment on photos.");
+      setCommentSubmitting(false);
+      return;
+    }
+
+    const { data, error: commentError } = await supabase
+      .from("photo_comments")
+      .insert({
+        beer_log_id: selectedPhoto.id,
+        user_id: userId,
+        comment: commentDraft.trim(),
+      })
+      .select("id, beer_log_id, user_id, comment, created_at, profiles(player_name)")
+      .single();
+
+    if (commentError || !data) {
+      setError(commentError?.message ?? "Could not add the comment.");
+    } else {
+      setComments((current) => ({
+        ...current,
+        [selectedPhoto.id]: [...(current[selectedPhoto.id] ?? []), data as PhotoComment],
+      }));
+      setCommentDraft("");
+    }
+    setCommentSubmitting(false);
+  }
+
   return (
     <div className="space-y-5">
       <header className="flex items-center gap-3">
@@ -516,6 +579,18 @@ export default function PhotosPage() {
               </div>
               <p className="mt-1 text-xs text-amber-300">{"★".repeat(photo.rating)}</p>
               <p className="truncate text-xs text-amber-500">{photo.bar_name ?? photo.city ?? "Unknown place"}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  const photoIndex = filteredPhotos.findIndex((item) => item.id === photo.id);
+                  if (photoIndex >= 0) openPhoto(photoIndex);
+                }}
+                className="mt-2 inline-flex items-center gap-1 text-xs text-amber-300 hover:text-amber-100"
+                aria-label={`View comments for ${photo.beer_name}`}
+              >
+                <MessageCircle size={13} />
+                {comments[photo.id]?.length ?? 0} {comments[photo.id]?.length === 1 ? "comment" : "comments"}
+              </button>
               <div className="mt-3 flex flex-wrap gap-1.5 border-t border-amber-800/70 pt-2">
                 {REACTIONS.map((reaction) => {
                   const counts = reactionCounts[photo.id] ?? emptyReactionCounts();
@@ -612,6 +687,55 @@ export default function PhotosPage() {
                     </button>
                   );
                 })}
+              </div>
+              <div className="mt-4 border-t border-amber-800/70 pt-3">
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-100">
+                  <MessageCircle size={15} />
+                  Comments ({selectedPhotoComments.length})
+                </div>
+                <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+                  {selectedPhotoComments.length === 0 ? (
+                    <p className="text-xs text-amber-500">No comments yet. Start the conversation.</p>
+                  ) : (
+                    selectedPhotoComments.map((comment) => (
+                      <div key={comment.id} className="rounded-md bg-amber-950/50 p-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-semibold text-amber-200">
+                            {Array.isArray(comment.profiles)
+                              ? comment.profiles[0]?.player_name ?? "Unknown player"
+                              : comment.profiles?.player_name ?? "Unknown player"}
+                          </span>
+                          <span className="text-[10px] text-amber-600">{formatDate(comment.created_at)}</span>
+                        </div>
+                        <p className="mt-1 break-words text-sm text-amber-300">{comment.comment}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <form
+                  className="mt-3 flex gap-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void submitComment();
+                  }}
+                >
+                  <input
+                    value={commentDraft}
+                    onChange={(event) => setCommentDraft(event.target.value.slice(0, 500))}
+                    placeholder="Write a comment..."
+                    maxLength={500}
+                    className="min-w-0 flex-1 rounded-md border border-amber-700 bg-amber-900/60 px-3 py-2 text-sm text-amber-100 placeholder:text-amber-600"
+                    aria-label="Comment on photo"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!commentDraft.trim() || commentSubmitting}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-amber-700 text-amber-100 transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label="Post comment"
+                  >
+                    <Send size={15} />
+                  </button>
+                </form>
               </div>
             </div>
           </DialogContent>
