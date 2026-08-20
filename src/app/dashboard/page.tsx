@@ -349,17 +349,23 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-amber-900/60 border-amber-700">
-          <CardContent className="p-4 flex items-center gap-3">
-            <Trophy className="text-amber-400" size={24} />
-            <div>
-              <p className="text-2xl font-bold text-amber-100">
-                {unlockedKeys.length}/{ACHIEVEMENTS.length}
-              </p>
-              <p className="text-xs text-amber-400">Achievements</p>
-            </div>
-          </CardContent>
-        </Card>
+        <Link
+          href="/achievements"
+          aria-label="Open badges page"
+          className="block rounded-xl transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+        >
+          <Card className="bg-amber-900/60 border-amber-700">
+            <CardContent className="p-4 flex items-center gap-3">
+              <Trophy className="text-amber-400" size={24} />
+              <div>
+                <p className="text-2xl font-bold text-amber-100">
+                  {unlockedKeys.length}/{ACHIEVEMENTS.length}
+                </p>
+                <p className="text-xs text-amber-400">Achievements</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       <Card className="border-amber-700 bg-amber-900/60">
