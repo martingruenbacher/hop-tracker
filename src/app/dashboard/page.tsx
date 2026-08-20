@@ -226,6 +226,11 @@ export default function DashboardPage() {
       { weightKg: player.weight_kg, sex: player.sex },
       now
     ),
+    beerTimes: new Set(
+      alcoholTimelineLogs
+        .filter((log) => log.user_id === player.id)
+        .map((log) => new Date(log.created_at).getTime())
+    ),
   }));
   const alcoholTimelineTimes = [...new Set(
     playerTimelines.flatMap(({ points }) => points.map((point) => point.time))
@@ -244,6 +249,9 @@ export default function DashboardPage() {
     return pointDay === alcoholChartDay;
   });
   const alcoholTimelineColors = ["#f59e0b", "#34d399", "#60a5fa", "#f472b6", "#a78bfa", "#fb7185"];
+  const selectedPlayerName = selectedAlcoholPlayers.length === 1
+    ? selectedAlcoholPlayers[0].player_name
+    : "Selected players";
 
   async function shareRecap() {
     const recap = `Hop Tracker recap: ${logs.length} beers, ${uniqueBars} pubs, ${avgRating} average rating. Top beer: ${topBeer?.beer_name ?? "TBD"}.`;
@@ -714,7 +722,10 @@ export default function DashboardPage() {
                 />
                 <Tooltip
                   labelFormatter={(value) => formatDate(new Date(Number(value)).toISOString())}
-                  formatter={(value) => [`${Number(value).toFixed(2)}‰`, "Estimated level"]}
+                  formatter={(value, name) => [
+                    `${Number(value).toFixed(2)}‰`,
+                    name === "estimated" ? `${selectedPlayerName} estimated level` : String(name),
+                  ]}
                   contentStyle={{
                     background: "#451a03",
                     border: "1px solid #92400e",
@@ -722,7 +733,7 @@ export default function DashboardPage() {
                     color: "#fef3c7",
                   }}
                 />
-                {selectedAlcoholPlayers.map((player, index) => (
+                {playerTimelines.map(({ player, beerTimes }, index) => (
                   <Line
                     key={player.id}
                     type="monotone"
@@ -730,7 +741,20 @@ export default function DashboardPage() {
                     name={player.player_name}
                     stroke={alcoholTimelineColors[index % alcoholTimelineColors.length]}
                     strokeWidth={3}
-                    dot={{ r: 3, fill: alcoholTimelineColors[index % alcoholTimelineColors.length], stroke: "#451a03", strokeWidth: 2 }}
+                    dot={(dotProps) => {
+                      const time = Number(dotProps.payload?.time);
+                      if (!beerTimes.has(time) || dotProps.cx === undefined || dotProps.cy === undefined) return null;
+                      return (
+                        <circle
+                          cx={dotProps.cx}
+                          cy={dotProps.cy}
+                          r={4}
+                          fill={alcoholTimelineColors[index % alcoholTimelineColors.length]}
+                          stroke="#451a03"
+                          strokeWidth={2}
+                        />
+                      );
+                    }}
                     activeDot={{ r: 6 }}
                   />
                 ))}
