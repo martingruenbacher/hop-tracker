@@ -254,6 +254,26 @@ export default function DashboardPage() {
     const pointDay = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
     return pointDay === alcoholChartDay;
   });
+  const litersTimeline = alcoholTimelineTimes.map((time) => {
+    const point: Record<string, number> = { time };
+    playerTimelines.forEach(({ player, logs }) => {
+      const logsAtTime = logs.filter(
+        (log) => new Date(log.created_at).getTime() <= time
+      );
+      if (logsAtTime.length > 0) {
+        point[player.id] = logsAtTime.reduce(
+          (total, log) => total + (log.volume_liters ?? 0.5),
+          0
+        );
+      }
+    });
+    return point;
+  }).filter((point) => {
+    if (alcoholChartDay === "all") return true;
+    const date = new Date(point.time);
+    const pointDay = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    return pointDay === alcoholChartDay;
+  });
   const alcoholTimelineColors = ["#f59e0b", "#34d399", "#60a5fa", "#f472b6", "#a78bfa", "#fb7185"];
   const selectedPlayerName = selectedAlcoholPlayers.length === 1
     ? selectedAlcoholPlayers[0].player_name
@@ -806,6 +826,88 @@ export default function DashboardPage() {
           )}
           <p className="mt-3 rounded-lg border border-red-900/70 bg-red-950/30 p-3 text-xs leading-5 text-red-300">
             This uses each logged beer amount with an assumed 5% ABV and does not account for food, health, medication, timing inaccuracies, or individual metabolism. Never use it to decide whether you can drive.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-amber-900/60 border-amber-700">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-amber-100 text-base">
+            Group liters over time
+          </CardTitle>
+          <p className="text-xs text-amber-500">
+            Cumulative beer volume for the selected players.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {selectedAlcoholPlayers.length === 0 || litersTimeline.length < 2 ? (
+            <p className="py-8 text-center text-sm text-amber-500">
+              Select a player with logged beers to start the liters timeline.
+            </p>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={litersTimeline} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
+                <XAxis
+                  dataKey="time"
+                  type="number"
+                  domain={["dataMin", "dataMax"]}
+                  scale="time"
+                  tickFormatter={(value) => formatDate(new Date(value).toISOString())}
+                  tick={{ fill: "#fbbf24", fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  domain={[0, "auto"]}
+                  tickFormatter={(value) => `${Number(value).toFixed(1)} l`}
+                  tick={{ fill: "#fbbf24", fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={42}
+                />
+                <Tooltip
+                  labelFormatter={(value) => formatDate(new Date(Number(value)).toISOString())}
+                  formatter={(value, name) => [
+                    `${Number(value).toFixed(2)} l`,
+                    String(name),
+                  ]}
+                  contentStyle={{
+                    background: "#451a03",
+                    border: "1px solid #92400e",
+                    borderRadius: 8,
+                    color: "#fef3c7",
+                  }}
+                />
+                {playerTimelines.map(({ player, beerTimes }, index) => (
+                  <Line
+                    key={player.id}
+                    type="stepAfter"
+                    dataKey={player.id}
+                    name={player.player_name}
+                    stroke={alcoholTimelineColors[index % alcoholTimelineColors.length]}
+                    strokeWidth={3}
+                    dot={(dotProps) => {
+                      const time = Number(dotProps.payload?.time);
+                      if (!beerTimes.has(time) || dotProps.cx === undefined || dotProps.cy === undefined) return null;
+                      return (
+                        <circle
+                          cx={dotProps.cx}
+                          cy={dotProps.cy}
+                          r={4}
+                          fill={alcoholTimelineColors[index % alcoholTimelineColors.length]}
+                          stroke="#451a03"
+                          strokeWidth={2}
+                        />
+                      );
+                    }}
+                    activeDot={{ r: 6 }}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+          <p className="mt-3 text-xs text-amber-500">
+            The lines use the same player selection and day filter as the alcohol-level chart.
           </p>
         </CardContent>
       </Card>
